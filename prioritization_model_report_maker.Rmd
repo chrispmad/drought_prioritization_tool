@@ -1,0 +1,252 @@
+---
+title: "Stream Prioritization Model"
+author: "Luke Eilertsen and Chris Madsen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, error = F)
+
+library(sf)
+library(tidyverse)
+
+# Ecosections with drought sensitivity
+ecosecs = read_sf('app/www/ecosections_with_drought_sensitivity.gpkg')
+
+# Species at risk (publically available) (pulling from another project I have)
+sar = sf::read_sf('../species_at_risk_visualizer/app/www/species_ecosystems_at_risk_publically_available_no_insects.gpkg') |> 
+  sf::st_transform(crs = 3005)
+
+# PSCIS Assessments
+pscis = sf::read_sf('raw_data/PSCIS_assessments.gpkg')
+
+# Read in R script that creates some custom functions we use below.
+source('functions.R')
+```
+
+```{r buffer}
+pscis = pscis |> 
+  sf::st_buffer(dist = 50) # Buffer by 50 meters
+```
+
+```{r summarise_sar_by_ecosec}
+sar_s = sar |> 
+  dplyr::select(
+    scientific_name = SCI_NAME,
+    english_name = ENG_NAME_F,
+    tax_class = TAX_CLASS,
+    glob_rank = GLOB_RANK,
+    prov_rank = PROV_RANK,
+    cosewic = COSEWIC,
+    bc_list = BC_LIST,
+    sara_sched = SARA_SCHED,
+    last_obs = LAST_OBS,
+    ecosec = ECOSECTION
+  )
+
+# Keep only amphibians, fishes, bivalves and lampreys in SAR layer.
+sar_s = sar_s |> 
+  dplyr::filter(tax_class %in% c("amphibians",
+                                 "ray-finned fishes",
+                                 "bivalves",
+                                 "Lampreys"))
+  
+sar_ss = rmapshaper::ms_simplify(sar_s)
+
+sf::write_sf(sar_ss, 'app/www/sar_very_simplified.gpkg')
+
+# Summarise the number of species-at-risk by ecosection; this is just the 
+# number of rows per ecosection, so it's fairly crude.
+sar_by_ecosec = sar_s |> 
+  st_drop_geometry() |> 
+  count(ecosec) |> 
+  tidyr::separate_longer_delim(ecosec, delim = ';') |> 
+  group_by(ecosec) |> 
+  summarise(number_sar = sum(n))
+
+# Join this number of sar by ecosection to the ecosections layer
+ecosecs = ecosecs |> 
+  left_join(
+    sar_by_ecosec |> 
+      dplyr::rename(
+      ECOSECTION_CODE = ecosec
+      )
+  )
+
+# Filter out NA values for winter / summer sensitivities.
+ecosecs = ecosecs |> 
+  dplyr::filter(!is.na(winter_sens))
+
+write_sf(ecosecs, 'app/www/ecosections_with_drought_sensitivity_and_sar.gpkg')
+```
+
+```{r set_sensitivity_levels}
+sensitivity_factor_levels = c('Not Sensitive',
+                              'Sensitive Proceed with caution',
+                              'Very Sensitive--Chronic Problems')
+```
+
+```{r apply_model}
+# 
+# # Cycle through ecosection names. For each name, do the following...
+# for(ecosec_name in ecosecs$ECOSECTION_NAME){
+#   
+#   # Take the ecosection name and make it lower-case.
+#   this_ecosec_snake = snakecase::to_snake_case(ecosec_name)
+#   
+#   # Read in stream geopackage file for this ecosection.
+#   streams_in_ecosec = sf::read_sf(paste0('streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
+#   
+#   # Fill in missing stream names where available and merge streams
+#   # by the unique ID column ('BLUE_LINE_KEY')
+#   streams_in_ecosec = clean_and_merge_streams(streams_in_ecosec)
+#   
+#   # Spatial overlay of pscis assessment info.
+#   streams_in_ecosec = spatial_overlay_join(streams_in_ecosec,
+#                        pscis,
+#                        'final_score')
+#   
+#   # Get the number of species-at-risk for this ecosection, if any.
+#   number_sar = sar_by_ecosec |> 
+#     dplyr::filter(ecosec == ecosecs[ecosecs$ECOSECTION_NAME == ecosec_name,]$ECOSECTION_CODE)
+#   
+#   # Join to streams.
+#   streams_in_ecosec$number_sar_in_ecosec = nrow(number_sar)
+#   
+#   # This chunk of code adds together choice variables to estimate an overall 
+#   # drought risk.
+#   stream_priorities = stream_prioritization_model(streams_in_ecosec,
+#                               variables = list('summer_sens',
+#                                                'winter_sens',
+#                                                'fish_observed',
+#                                                'habitat_value',
+#                                                'number_sar_in_ecosec'),
+#                               levels = list(sensitivity_factor_levels,
+#                                             sensitivity_factor_levels,
+#                                             c("N","Y"),
+#                                             c("Low habitat value",
+#                                               "Medium habitat value",
+#                                               "High habitat value"),
+#                                             'numeric'))
+#   
+#   # Join the calculated priority rating to the streams spatial file.
+#   streams_in_ecosec = streams_in_ecosec |> 
+#     dplyr::left_join(stream_priorities)
+#   
+#   # Simplify stream geometries.
+#   streams_in_ecosec = tryCatch(
+#     rmapshaper::ms_simplify(streams_in_ecosec),
+#     error = function(e) return(streams_in_ecosec)
+#   )
+#   
+#   # Reproject the streams to WGS 84.
+#   streams_in_ecosec = sf::st_transform(streams_in_ecosec, crs = 4326)
+#   
+#   sf::write_sf(streams_in_ecosec, paste0('app/www/streams/',this_ecosec_snake,'_simple.gpkg'))
+# }
+```
+
+```{r leaflet_map}
+library(leaflet)
+
+example_streams = sf::read_sf('app/www/streams/cariboo_basin_simple.gpkg') |> 
+  sf::st_transform(4326)
+
+my_breaks = BAMMtools::getJenksBreaks(example_streams$priority_rating, 5)
+
+# min_value = min(example_streams$priority_rating)-1
+# 
+# max_value = middle_high_value + 1
+# 
+# middle_high_value = max(example_streams$priority_rating)
+# 
+# middle_value = floor(median(unique(example_streams$priority_rating)))
+
+
+# as.numeric(cut(c(5,5,8), breaks = c(min_value, middle_value, max_value)))
+
+my_pal = leaflet::colorBin(
+  palette = 'Spectral',
+  domain = example_streams$priority_rating,
+  bins = 5,
+  reverse = T
+)
+
+my_pal_legend = leaflet::colorBin(
+  palette = 'Spectral',
+  domain = example_streams$priority_rating,
+  bins = 5,
+  reverse = F
+)
+
+info_popup = leafpop::popupTable(
+  example_streams |> 
+    dplyr::select(Name = GNIS_NAME,
+                  `Summer Sensitivity` = summer_sens,
+                  `Winter Sensitivity` = winter_sens,
+                  `Assessment Date` = assessment_date,
+                  `Fish Observed` = fish_observed,
+                  `Crossing Type` = crossing_type,
+                  `Crossing Subtype` = crossing_subtype,
+                  Barrier = barrier,
+                  `Habitat Value` = habitat_value,
+                  `Priority Rating` = priority_rating) |> 
+    sf::st_drop_geometry()
+)
+
+ecosec_palette = leaflet::colorFactor(
+  palette = 'Spectral',
+  domain = ecosecs$summer_sens,
+  reverse = T
+)
+
+ecosec_palette_legend = leaflet::colorFactor(
+  palette = 'Spectral',
+  domain = ecosecs$summer_sens,
+  reverse = F
+)
+
+leaflet() |> 
+  addTiles() |> 
+  addPolygons(
+    fillColor = ~ ecosec_palette(winter_sens),
+    fillOpacity = 0.5,
+    color = 'black',
+    weight = 2,
+    data = ecosecs,
+    popup = ~winter_sens,
+    group = 'winter_sens'
+  ) |> 
+  addPolygons(
+    fillColor = ~ ecosec_palette(summer_sens),
+    fillOpacity = 0.5,
+    color = 'black',
+    weight = 2,
+    data = ecosecs,
+    popup = ~summer_sens,
+    group = 'summer_sens'
+  ) |> 
+  addPolylines(
+    color = ~my_pal(priority_rating),
+    label = ~paste0('Priority Rating: ',priority_rating),
+    popup = info_popup,
+    opacity = 1,
+    weight = 2,
+    data = example_streams
+  ) |> 
+  addLegend(
+    title = 'Ecosection Drought Sensitivity',
+    pal = ecosec_palette_legend, 
+    values = ecosecs$winter_sens,
+    labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))) |> 
+  addLegend(
+    title = 'Stream Priority',
+    pal = my_pal_legend, 
+    values = example_streams$priority_rating,
+            labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))) |> leaflet::addLayersControl(baseGroups =  c("winter_sens","summer_sens")) |> 
+  setView(lat = 51.88,
+          lng = -121.70,
+          zoom = 8)
+```
+
