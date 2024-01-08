@@ -4,8 +4,6 @@ library(leaflet)
 library(leafpop)
 library(capture)
 
-# 
-
 # =======================
 #   Define UI pieces      
 # =======================
