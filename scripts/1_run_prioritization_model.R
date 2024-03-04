@@ -1,13 +1,33 @@
-# Load libraries
+# Title: Run Prioritization Model
 
+# Date: 2024-03-04
+
+# Authors: Luke Eilertsen and Chris Madsen
+
+# Running this script will update the data files of the Stream Drought Sensitivity App.
+
+# Description: Ron Ptolemy (WLRS, Aquatic Ecosystems Branch, Conservation Science Section)
+# identified ecosections throughout BC that, based on his datasets, seem drought sensitive.
+# Ecosections were ranked from 1 to 3, where 3 means very drought sensitive and 1 means not drought sensitive.
+# Specifically, these results were collated by Ron (et al.) in an EFN Report / paper.
+# 
+# Ron and co. also identified particular streams in each ecosection to serve as examples.
+
+# This script searches the BC Data Catalogue's Freshwater Atlas Stream Network
+# for the streams identified by Ron et al., specifically searching by stream name.
+
+# Note that not all streams could be found using this automated approach; 
+# Luke E. painstakingly searched for and collated these missing streams into
+# a second spatial file ('Rons_DroughtSensitive_Streams_Luke_Compilation.shp', 
+# located here: \\\\spatialfiles.bcgov\\work\\wlap\\kam\\Workarea\\LEilertsen\\FlowSensitive_Ecosections_Streams\\FlwSensitive_Ecosec_Streams\\
+# and also located here: )
+
+
+# Load libraries
 library(sf)
 library(tidyverse)
 
 # Read in data files.
-
-
-# Maybe apply that query that drops streams of stream_order 1 IF either
-# sensitivity is NOT the highest one.
 
 # Species at risk (publically available) (pulling from another project I have)
 sar = sf::read_sf('../species_at_risk_visualizer/app/www/species_ecosystems_at_risk_publically_available_no_insects.gpkg') |> 
@@ -19,8 +39,14 @@ pscis = sf::read_sf('raw_data/PSCIS_assessments.gpkg')
 # Ecosections
 ecosecs = read_sf('app/www/ecosections_with_drought_sensitivity.gpkg')
 
-# Ron Ptolemy's hand-selected streams and rivers
-rons_streams = readxl::read_excel('app/www/FlowSensitiveStreams_RonsEcosections.xlsx')
+# Ron Ptolemy's hand-selected streams and rivers, digitized by Luke Eilertsen.
+rons_streams = sf::read_sf('app/www/ron_identified_streams.gpkg')
+
+rons_streams_blk = rons_streams |> 
+  dplyr::filter(BLUE_LINE_ != '0')
+
+rons_streams_no_blk = rons_streams |> 
+  dplyr::filter(BLUE_LINE_ == '0')
 
 # Other layers...
 
@@ -31,9 +57,6 @@ rons_streams = readxl::read_excel('app/www/FlowSensitiveStreams_RonsEcosections.
 pscis_b = pscis |> 
   sf::st_buffer(dist = 50) # Buffer by 50 meters
 
-# bcdata::bcdc_query_list('freshwater-atlas-stream-network') |> 
-#   filter(ST_INTERSECTS(selected_ecosec))
-
 sensitivity_factor_levels = c('Not Sensitive',
                               'Sensitive Proceed with caution',
                               'Very Sensitive--Chronic Problems')
@@ -43,12 +66,12 @@ sensitivity_factor_levels = c('Not Sensitive',
 #   Apply model
 # =======================
 
-name_mismatches = data.frame(
-  stream_name = c(""),
-  ecosection_name = c("")
-)
+# name_mismatches = data.frame(
+#   stream_name = c(""),
+#   ecosection_name = c("")
+# )
 
-ecosec_name = ecosecs$ECOSECTION_NAME[1]
+# ecosec_name = ecosecs$ECOSECTION_NAME[1]
 
 for(ecosec_name in ecosecs$ECOSECTION_NAME){
   
@@ -56,7 +79,7 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
   
   this_ecosec_snake = snakecase::to_snake_case(ecosec_name)
   
-  streams_in_ecosec = sf::read_sf(paste0('streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
+  streams_in_ecosec = sf::read_sf(paste0('intermediate_data/streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
   
   # Merge streams by BLUE_LINE_KEY (and GNIS_NAME, if available)
   streams_in_ecosec = streams_in_ecosec |> 
@@ -69,7 +92,7 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
     mutate(across(where(is.numeric), \(x) replace_na(x, 0))) |> 
     mutate(across(where(is.character), \(x) replace_na(x, 'Unknown')))
   
-  # Spatial overlay of SAR also.
+  # Spatial overlay of SAR.
   initial_spatial_match = streams_in_ecosec |> 
     st_join(sar |> 
               select(SCI_NAME, ENG_NAME, TAX_CLASS), st_intersects)
@@ -96,30 +119,45 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
     ungroup() |> 
     dplyr::left_join(number_distinct_SAR_by_BLK)
   
-  # Add in Ron's select streams/rivers.
-  rons_streams_in_this_ecosec = rons_streams |> 
-    dplyr::filter(Ecosection == ecosec_name)
-  
-  rons_streams_in_this_ecosec = rons_streams_in_this_ecosec |> 
-    dplyr::select(GNIS_NAME = Stream,
-                  summer_sens_expert_id = `Summer Sensitive`,
-                  winter_sens_expert_id = `Winter Sensitive`)
-  
-  # Test to see if the number of rows of streams whose names match our 'streams_in_ecosec'
-  # is the same as the number of rows in Ron's excel file. Hopefully it is. If not,
-  # write mismatching streams into .csv object.
-  
-  if(nrow(rons_streams_in_this_ecosec |> 
-    dplyr::filter(GNIS_NAME %in% streams_in_ecosec$GNIS_NAME)) < nrow(rons_streams_in_this_ecosec)){
-    name_mismatches = name_mismatches |> 
-      dplyr::bind_rows(rons_streams_in_this_ecosec |> 
-                         dplyr::filter(!GNIS_NAME %in% streams_in_ecosec$GNIS_NAME) |> 
-                         dplyr::select(stream_name = GNIS_NAME) |> 
-                         dplyr::mutate(ecosection_name = ecosec_name))
-  }
-  
+  # Simple left join for those of Ron's select streams that have BLUE_LINE_KEY.
   streams_in_ecosec = streams_in_ecosec |> 
-    dplyr::left_join(rons_streams_in_this_ecosec)
+    dplyr::left_join(
+      rons_streams_blk |> 
+        dplyr::mutate(BLUE_LINE_KEY = as.integer(BLUE_LINE_)) |> 
+        sf::st_drop_geometry() |> 
+        dplyr::filter(!duplicated(BLUE_LINE_KEY)) |> 
+        dplyr::select(BLUE_LINE_KEY, 
+                      stream_summer_sens = Summer_Sen, 
+                      stream_winter_sens = Winter_Sen)
+    )
+  
+  # For those streams that did not have BLUE_LINE_KEY, spatial overlay.
+  stream_spatial_match = sf::st_join(
+    streams_in_ecosec,
+    rons_streams_no_blk |> 
+      dplyr::select(stream_summer_sens_spatial = Summer_Sen, 
+                    stream_winter_sens_spatial = Winter_Sen)
+  ) |> 
+    dplyr::filter(!is.na(stream_summer_sens_spatial))
+  
+  if(nrow(stream_spatial_match) > 0){
+    streams_in_ecosec = streams_in_ecosec |> 
+      # Left join the result of spatial matching, just with new columns and BLK
+      dplyr::left_join(
+        stream_spatial_match |> 
+          sf::st_drop_geometry() |> 
+          dplyr::filter(!is.na(BLUE_LINE_KEY)) |> 
+          dplyr::select(BLUE_LINE_KEY,
+                        stream_summer_sens_spatial,
+                        stream_winter_sens_spatial) |> 
+          dplyr::filter(!duplicated(BLUE_LINE_KEY))
+      ) |> 
+      # If there is data in the spatial matching columns of summer and winter sensitivity,
+      # use those to replace the NA from the initial left_join we used above.
+      dplyr::mutate(stream_summer_sens = ifelse(is.na(stream_summer_sens),stream_summer_sens_spatial,stream_summer_sens),
+                    stream_winter_sens = ifelse(is.na(stream_winter_sens),stream_winter_sens_spatial,stream_winter_sens)
+                    )
+  }
   
   # This chunk of code adds together choice variables to estimate an overall 
   # drought risk.
@@ -129,8 +167,8 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
     # Convert variables to factors; this let's us add them together.
     mutate(summer_sens_numeric = as.numeric(factor(summer_sens, levels = sensitivity_factor_levels))-1,
            winter_sens_numeric = as.numeric(factor(winter_sens, levels = sensitivity_factor_levels))-1,
-           summer_sens_expert_id = ifelse(summer_sens_expert_id == 'Y', 1, 0),
-           winter_sens_expert_id = ifelse(winter_sens_expert_id == 'Y', 1, 0),
+           stream_summer_sens_numeric = ifelse(stream_summer_sens == 'Y', 1, 0),
+           stream_winter_sens_numeric = ifelse(stream_winter_sens == 'Y', 1, 0),
            fish_observed_numeric = as.numeric(factor(fish_observed, levels = c("N","Y"))) - 1,
            habitat_value_numeric = as.numeric(factor(habitat_value, levels = c("Low habitat value",
                                                             "Medium habitat value",
@@ -139,16 +177,12 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
   stream_drought_risk = streams_in_ecosec_w_numeric |> 
     pivot_longer(cols = c(summer_sens_numeric,
                           winter_sens_numeric,
-                          summer_sens_expert_id,
-                          winter_sens_expert_id,
+                          stream_summer_sens_numeric,
+                          stream_winter_sens_numeric,
                           fish_observed_numeric,
                           habitat_value_numeric,
                           number_distinct_SAR)) |> 
     dplyr::select(BLUE_LINE_KEY,GNIS_NAME,name,value) |> 
-    # dplyr::left_join(
-    #   streams_in_ecosec_w_numeric |> dplyr::select(BLUE_LINE_KEY,GNIS_NAME,summer_sens,
-    #                                                winter_sens,fish_observed,habitat_value)
-    #   ) |> 
     group_by(BLUE_LINE_KEY,GNIS_NAME) |> 
     mutate(drought_risk = sum(value, na.rm=T)) |> 
     dplyr::select(-c(name,value)) |> 
@@ -168,13 +202,11 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
   # Reproject the streams to WGS 84.
   streams_in_ecosec = sf::st_transform(streams_in_ecosec, crs = 4326)
   
-  sf::write_sf(streams_in_ecosec, paste0('streams_by_ecosec_with_drought_info/',this_ecosec_snake,'_simple.gpkg'))
+  sf::write_sf(streams_in_ecosec, paste0('intermediate_data/streams_by_ecosec_with_drought_info/',this_ecosec_snake,'_simple.gpkg'))
 }
 
-write.csv(name_mismatches, 'output/name_mismatch.csv')
-
 # Add them all together too!
-all_streams = list.files('streams_by_ecosec_with_drought_info/',full.names = T) |> 
+all_streams = list.files('intermediate_data/streams_by_ecosec_with_drought_info/',full.names = T) |> 
   lapply(\(x)
          sf::read_sf(x)) |> 
   bind_rows()
@@ -184,17 +216,56 @@ all_streams = list.files('streams_by_ecosec_with_drought_info/',full.names = T) 
 # of a given GNIS_NAME / BLUE_LINE_KEY.
 all_streams_c = all_streams |> 
   group_by(GNIS_NAME, BLUE_LINE_KEY) |> 
-  mutate(winter_sens_expert_id = max(winter_sens_expert_id, na.rm=T),
-         summer_sens_expert_id = max(summer_sens_expert_id, na.rm=T),
-         drought_risk = max(replace_na(drought_risk,0), na.rm=T),
-         number_distinct_SAR = max(replace_na(number_distinct_SAR,0), na.rm=T)
+  mutate(
+    drought_risk = max(replace_na(drought_risk,0), na.rm=T),
+    number_distinct_SAR = max(replace_na(number_distinct_SAR,0), na.rm=T)
          ) |> 
   ungroup()
 
-sf::write_sf(all_streams_c, 'C:/Users/CMADSEN/Downloads/all_streams_corrected.gpkg')
+sf::write_sf(all_streams_c, 'output/all_streams_corrected.gpkg')
 
-all_streams_c = sf::read_sf('C:/Users/CMADSEN/Downloads/all_streams_corrected.gpkg')
 
+################
+#  RESUME HERE #
+#  We're changing from 2 columns for winter and summer expert ID, which 
+#  were using Ron's excel table and basic name matching, to now use
+#  spatialized streams from Ron's list that we make in another script.
+#  So, we just want one column called something like 'expert_id'.
+#  There are duplicate matches so have to think about how to clean those up.
+
+# rons_streams = sf::read_sf('output/ron_streams_layer.gpkg')
+
+# all_streams_c = sf::read_sf('output/all_streams_corrected.gpkg')
+# 
+# test = all_streams_c |> 
+#   st_join(
+#     rons_streams |> 
+#       dplyr::mutate(expert_id = 1) |> 
+#       select(expert_id, GNIS_NAME_ron = GNIS_NAME) |> 
+#       sf::st_transform(4326)
+#   )
+
+all_streams_choice_cols = all_streams_c |> 
+  dplyr::select(drought_risk,
+                BLUE_LINE_KEY,
+                GNIS_NAME,
+                number_distinct_SAR,
+                SCI_NAME,
+                ENG_NAME,
+                stream_winter_sens,
+                stream_summer_sens,
+                summer_sens,
+                winter_sens,
+                fish_observed
+                )
+
+write_sf(all_streams_choice_cols, 'app/www/all_streams_w_drought_risk_and_rons_streams_matched_2.gpkg')
+
+# test$expert_id
+
+##### CODE BELOW HAS NOT BEEN TESTED OR RERUN IN A WHILE
+  
+nrow(test)
 # Make sure that 
 all_streams_w_weights = all_streams_c |> 
   dplyr::mutate(summer_sens = as.numeric(factor(summer_sens, levels = sensitivity_factor_levels))-1,

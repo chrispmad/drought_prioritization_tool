@@ -1,3 +1,12 @@
+# This script takes the province-wide, massive stream geopackage file
+# ("streams_w_drought.gpkg", in the raw_data folder)
+# and it splits it by ecosection. It also filters out streams of 
+# stream order 1 and 2, as well as stream pieces defined as 'lake-def skelet'
+# (i.e. lake center lines) and 'OP'.
+
+# Only rerun this script if you are lacking 
+
+
 library(sf)
 library(tidyverse)
 
@@ -33,7 +42,7 @@ if(!file.exists('raw_data/streams_w_drought.gpkg')){
   
   sf::write_sf(streams, 'raw_data/streams_w_drought.gpkg')
 } else {
-  if(!file.exists(paste0('streams_by_ecosec/streams_alsek_ranges.gpkg'))){
+  if(!file.exists(paste0('intermediate_data/streams_by_ecosec/streams_alsek_ranges.gpkg'))){
     
     streams = sf::read_sf('raw_data/streams_w_drought.gpkg')
     
@@ -83,7 +92,7 @@ if(!file.exists('raw_data/streams_w_drought.gpkg')){
       streams_in_ecosec = streams |> 
         dplyr::filter(ECOSECTION_NAME == ecosec_name)
       
-      write_sf(streams_in_ecosec, paste0('streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
+      write_sf(streams_in_ecosec, paste0('intermediate_data/streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
     }
   }
   rm(streams)
@@ -101,30 +110,14 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
   
   this_ecosec_snake = snakecase::to_snake_case(ecosec_name)
   
-  streams_in_ecosec = sf::read_sf(paste0('streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
+  streams_in_ecosec = sf::read_sf(paste0('intermediate_data/streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
   
   # Remove lake-defining skeletons and 
   streams_in_ecosec = streams_in_ecosec |> 
     filter(STREAM_ORDER > 2) |> 
     filter(!FEATURE_SOURCE %in% c("lake-def skelet","OP"))
   
-  sf::write_sf(streams_in_ecosec, paste0('streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
-  
-  # if(interactive()){
-  # ggplot() + 
-  #   geom_sf(data = ecosecs_w_d |> 
-  #             filter(ECOSECTION_NAME == ecosec_name),
-  #           aes(fill = summer_sens)) +
-  #   geom_sf(data = streams_in_ecosec |> 
-  #             filter(STREAM_ORDER >= 6) |> 
-  #             sf::st_transform(4326),
-  #           aes(col = summer_sens)) + 
-  #   scale_color_manual(values = c("Not Sensitive" = 'gold',
-  #                                 "Very Sensitive--Chronic Problems" = 'red')) +
-  #   scale_fill_manual(values = c("Not Sensitive" = 'lightblue',
-  #                                "Very Sensitive--Chronic Problems" = 'red'))
-  # }
-  
+  sf::write_sf(streams_in_ecosec, paste0('intermediate_data/streams_by_ecosec/streams_',this_ecosec_snake,'.gpkg'))
   
 }
 

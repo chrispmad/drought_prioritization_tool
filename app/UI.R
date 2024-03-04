@@ -21,7 +21,7 @@ winter_sens_w_input = div(
     column(
       width = 10,
       numericInput('winter_sens_w_input',
-                   'Winter',
+                   'Winter  - Ecosection',
                    min = 1, 
                    max = 5,
                    value = 1) |> 
@@ -42,7 +42,7 @@ summer_sens_w_input = div(
     column(
       width = 10,
       numericInput('summer_sens_w_input',
-                   'Summer',
+                   'Summer - Ecosection',
                    min = 1, 
                    max = 5,
                    value = 1) |> 
@@ -51,68 +51,86 @@ summer_sens_w_input = div(
   )
 )
 
-winter_sens_exp_id_w_input = div(
+# exp_id_w_input = div(
+#   fluidRow(
+#     column(
+#       width = 2,
+#       checkboxInput('include_exp_id',
+#                     '',
+#                     value = T)
+#     ),
+#     column(
+#       width = 10,
+#       numericInput('exp_id_w_input',
+#                    'Expert ID',
+#                    min = 1,
+#                    max = 5,
+#                    value = 1) |>
+#         tooltip('a value from 1 to 5')
+#     )
+#   )
+# )
+
+stream_summer_sens_w_input = div(
   fluidRow(
     column(
       width = 2,
-      # Checkbox input
-      checkboxInput('include_exp_id_winter_sens',
+      checkboxInput('include_stream_summer_sens',
                     '',
                     value = T)
     ),
     column(
       width = 10,
-      numericInput('exp_id_winter_sens_w_input',
-                   'Expert ID Winter',
-                   min = 1, 
+      numericInput('stream_summer_sens_w_input',
+                   'Summer - Stream',
+                   min = 1,
                    max = 5,
-                   value = 1) |> 
+                   value = 1) |>
         tooltip('a value from 1 to 5')
     )
   )
 )
 
-summer_sens_exp_id_w_input = div(
+stream_winter_sens_w_input = div(
   fluidRow(
     column(
       width = 2,
-      # Checkbox input
-      checkboxInput('include_exp_id_summer_sens',
+      checkboxInput('include_stream_winter_sens',
                     '',
                     value = T)
     ),
     column(
       width = 10,
-      numericInput('exp_id_summer_sens_w_input',
-                   'Expert ID Summer',
-                   min = 1, 
+      numericInput('stream_winter_sens_w_input',
+                   'Winter - Stream',
+                   min = 1,
                    max = 5,
-                   value = 1) |> 
+                   value = 1) |>
         tooltip('a value from 1 to 5')
     )
   )
 )
 
-habitat_quality_w_input = div(
-  fluidRow(
-    column(
-      width = 2,
-      # Checkbox input
-      checkboxInput('include_habitat_quality',
-                    '',
-                    value = T)
-    ),
-    column(
-      width = 10,
-      numericInput('habitat_quality_w_input',
-                   'Habitat Quality',
-                   min = 1, 
-                   max = 5,
-                   value = 1) |> 
-        tooltip('a value from 1 to 5')
-    )
-  )
-)
+# habitat_quality_w_input = div(
+#   fluidRow(
+#     column(
+#       width = 2,
+#       # Checkbox input
+#       checkboxInput('include_habitat_quality',
+#                     '',
+#                     value = T)
+#     ),
+#     column(
+#       width = 10,
+#       numericInput('habitat_quality_w_input',
+#                    'Habitat Quality',
+#                    min = 1, 
+#                    max = 5,
+#                    value = 1) |> 
+#         tooltip('a value from 1 to 5')
+#     )
+#   )
+# )
 
 sar_w_input = div(
   fluidRow(
@@ -158,7 +176,7 @@ fish_obs_w_input = div(
 
 number_streams_to_show = sliderInput(
   'number_streams_to_show',
-  'Number Streams to Show',
+  'Number of Streams to Show',
   min = 25,
   max = 300,
   value = 200,
@@ -177,25 +195,28 @@ weight_inputs = div(
   ),
   fluidRow(
     column(width = 6,
-           winter_sens_exp_id_w_input
+           stream_winter_sens_w_input
     ),
     column(width = 6,
-           summer_sens_exp_id_w_input
+           stream_summer_sens_w_input
     )
   ),
+  h5("Ecological Variables"),
+  # fluidRow(
+  #   column(width = 6,
+  #          winter_sens_exp_id_w_input
+  #   ),
+  #   column(width = 6,
+  #          summer_sens_exp_id_w_input
+  #   )
+  # ),
   fluidRow(
     column(width = 6,
            sar_w_input
     ),
     column(width = 6,
-           habitat_quality_w_input
-    )
-  ),
-  fluidRow(
-    column(width = 6,
            fish_obs_w_input
-    ),
-    column(width = 6
+           # habitat_quality_w_input
     )
   ),
   style = 'margin-top:-1rem;'
@@ -251,12 +272,25 @@ sidebar = #absolutePanel(
 # Main page with map
 
 main = div(
-  leafletOutput('leaflet_map',
+  tags$div(
+    id = "loadingImg",
+    tags$img(id = "loadingImg", 
+             src = "map_load_still_complete.png", 
+             style = "position:absolute;width:145vh;
+           height:90vh;top:8vh;left:60vh;z-index:1000;"),
+    tags$div(
+      style = 'position:absolute;width:145vh;background-color:grey;opacity:0.5;height:90vh;top:8vh;left:60vh;z-index:1100;'
+    ),
+    tags$p('Loading... please wait 1 - 2 minutes...',
+           style = 'position:absolute;top:55vh;left:120vh;z-index:1101;font-family:fantasy;font-size:larger;')
+  ),
+    leafletOutput('leaflet_map',
                 height = '90vh'
                 )
 )
     
 ui <- page_navbar(
+  shinyjs::useShinyjs(),
   theme = bslib::bs_theme(preset = 'flatly'),
   title = 'Stream Drought Sensitivity',
   selected = 'Tool',
@@ -279,7 +313,7 @@ ui <- page_navbar(
     h5("1. Conservation Data Center"),
     p("Publically available Aquatic Species-at-risk layer"),
     h5('2. Streams from the Freshwater Atlas layer'),
-    p("Stream network lines"),
+    p("Stream network lines (only steams of order 3 or greater included)"),
     h5('3. PSCIS (Provincial Stream Crossing Inventory System)'),
     p('Describes various measures of fish passage, habitat quality, waterway morphology.'),
     h3("Provincial Hydrologist Ron Ptolemy"),
