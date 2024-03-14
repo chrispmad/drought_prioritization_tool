@@ -8,244 +8,27 @@ library(capture)
 #   Define UI pieces      
 # =======================
 
-# Weights selection for variables.
-winter_sens_w_input = div(
-  fluidRow(
-    column(
-      width = 12,
-      # Checkbox input
-      checkboxInput('include_winter_sens',
-                    'Winter  - Ecosection',
-                    value = T)
-    )#,
-    # column(
-    #   width = 10,
-    #   numericInput('winter_sens_w_input',
-    #                'Winter  - Ecosection',
-    #                min = 1, 
-    #                max = 5,
-    #                value = 1) |> 
-    #     tooltip('a value from 1 to 5')
-    # )
-  )
+season_selector = checkboxGroupInput(
+  'season_sel',
+  'Season Selector',
+  choices = c("Summer","Winter"),
+  selected = c("Summer","Winter")
 )
 
-summer_sens_w_input = div(
-  fluidRow(
-    column(
-      width = 12,
-      # Checkbox input
-      checkboxInput('include_summer_sens',
-                    'Summer - Ecosection',
-                    value = T)
-    )#,
-    # column(
-    #   width = 10,
-    #   numericInput('summer_sens_w_input',
-    #                'Summer - Ecosection',
-    #                min = 1, 
-    #                max = 5,
-    #                value = 1) |> 
-    #     tooltip('a value from 1 to 5')
-    # )
-  )
+slider_factor_options = factor(x = c("Neither Summer nor Winter",
+                                     "Summer or Winter",
+                                     "Summer and Winter"))
+
+streams_to_show = shinyWidgets::sliderTextInput(
+  'streams_to_show',
+  'Streams to Show',
+  choices = slider_factor_options,
+  selected = 'Summer and Winter'
 )
 
-# exp_id_w_input = div(
-#   fluidRow(
-#     column(
-#       width = 2,
-#       checkboxInput('include_exp_id',
-#                     '',
-#                     value = T)
-#     ),
-#     column(
-#       width = 10,
-#       numericInput('exp_id_w_input',
-#                    'Expert ID',
-#                    min = 1,
-#                    max = 5,
-#                    value = 1) |>
-#         tooltip('a value from 1 to 5')
-#     )
-#   )
-# )
-
-stream_summer_sens_w_input = div(
-  fluidRow(
-    column(
-      width = 12,
-      checkboxInput('include_stream_summer_sens',
-                    'Summer - Stream',
-                    value = T)
-    )#,
-    # column(
-    #   width = 10,
-    #   numericInput('stream_summer_sens_w_input',
-    #                'Summer - Stream',
-    #                min = 1,
-    #                max = 5,
-    #                value = 1) |>
-    #     tooltip('a value from 1 to 5')
-    # )
-  )
-)
-
-stream_winter_sens_w_input = div(
-  fluidRow(
-    column(
-      width = 12,
-      checkboxInput('include_stream_winter_sens',
-                    'Winter - Stream',
-                    value = T)
-    )#,
-    # column(
-    #   width = 10,
-    #   numericInput('stream_winter_sens_w_input',
-    #                'Winter - Stream',
-    #                min = 1,
-    #                max = 5,
-    #                value = 1) |>
-    #     tooltip('a value from 1 to 5')
-    # )
-  )
-)
-
-# habitat_quality_w_input = div(
-#   fluidRow(
-#     column(
-#       width = 2,
-#       # Checkbox input
-#       checkboxInput('include_habitat_quality',
-#                     '',
-#                     value = T)
-#     ),
-#     column(
-#       width = 10,
-#       numericInput('habitat_quality_w_input',
-#                    'Habitat Quality',
-#                    min = 1, 
-#                    max = 5,
-#                    value = 1) |> 
-#         tooltip('a value from 1 to 5')
-#     )
-#   )
-# )
-
-sar_w_input = div(
-  fluidRow(
-    column(
-      width = 2,
-      # Checkbox input
-      checkboxInput('include_sar',
-                    '',
-                    value = T)
-    ),
-    column(
-      width = 10,
-      numericInput('sar_w_input',
-                   'Aquatic SAR',
-                   min = 1, 
-                   max = 5,
-                   value = 1) |> 
-        tooltip('SAR = Species-at-risk; a value from 1 to 5')
-    )
-  )
-)
-
-fish_obs_w_input = div(
-  fluidRow(
-    column(
-      width = 2,
-      # Checkbox input
-      checkboxInput('include_fish_observed',
-                    '',
-                    value = T)
-    ),
-    column(
-      width = 10,
-      numericInput('fish_obs_w_input',
-                   'Fish Observed',
-                   min = 1, 
-                   max = 5,
-                   value = 1) |> 
-        tooltip('a value from 1 to 5')
-    )
-  )
-)
-
-number_streams_to_show = sliderInput(
-  'number_streams_to_show',
-  'Number of Streams to Show',
-  min = 25,
-  max = 1000,
-  value = 200,
-  step = 50
-)
-
-weight_inputs = div(
-  h5("Drought Sensitivity"),
-  fluidRow(
-    # column(width = 6,
-           winter_sens_w_input,
-           # ),
-    # column(width = 6,
-           summer_sens_w_input,
-           # )
-  # ),
-  # fluidRow(
-    # column(width = 6,
-           stream_winter_sens_w_input,
-    # ),
-    # column(width = 6,
-           stream_summer_sens_w_input
-    # )
-  ),
-  h5("Ecological Variables"),
-  # fluidRow(
-  #   column(width = 6,
-  #          winter_sens_exp_id_w_input
-  #   ),
-  #   column(width = 6,
-  #          summer_sens_exp_id_w_input
-  #   )
-  # ),
-  fluidRow(
-    column(width = 6,
-           sar_w_input
-    ),
-    column(width = 6,
-           fish_obs_w_input
-           # habitat_quality_w_input
-    )
-  ),
-  style = 'margin-top:-1rem;'
-)
-
-run_model_button = div(
-  actionButton(
-    'run_model_button',
-    label = 'Rerun Model',
-    icon = shiny::icon("repeat"),
-    class = "btn-success"
-  ),
-  style = 'text-align:center;margin-top:0rem;margin-bottom:1rem;'
-)
-
-# Draggable toolbar
-sidebar = #absolutePanel(
-  #draggable = TRUE,
-  # height = 500,
-  # width = 400,
-  # left = 80,
-  # top = 60,
-  # bslib::sidebar(
-    # width = '30%',
-  # card(
-  div(
-  number_streams_to_show,
-  weight_inputs,
-  run_model_button,
+sidebar = div(
+  season_selector,
+  streams_to_show,
   layout_column_wrap(
     1/3,
     capture::capture(
@@ -265,9 +48,6 @@ sidebar = #absolutePanel(
   ),
   style = 'padding-top:10px;'
   )
-# ),
-# style = 'z-index: 100;'
-
 
 # Main page with map
 
