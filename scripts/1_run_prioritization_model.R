@@ -195,7 +195,7 @@ for(ecosec_name in ecosecs$ECOSECTION_NAME){
   
   # Simplify stream geometries.
   streams_in_ecosec = tryCatch(
-    rmapshaper::ms_simplify(streams_in_ecosec),
+    rmapshaper::ms_simplify(streams_in_ecosec, keep = 0.025),
     error = function(e) return(streams_in_ecosec)
   )
   
@@ -259,57 +259,62 @@ all_streams_choice_cols = all_streams_c |>
                 fish_observed
                 )
 
+# Attempting to further simplify the dataset...
+streams_very_simplified = rmapshaper::ms_simplify(all_streams_choice_cols, keep = 0.10)
+
+write_sf(streams_very_simplified, 'app/www/streams_simplified.gpkg')
+
 write_sf(all_streams_choice_cols, 'app/www/all_streams_w_drought_risk_and_rons_streams_matched_2.gpkg')
 
-# test$expert_id
-
-##### CODE BELOW HAS NOT BEEN TESTED OR RERUN IN A WHILE
-  
-nrow(test)
-# Make sure that 
-all_streams_w_weights = all_streams_c |> 
-  dplyr::mutate(summer_sens = as.numeric(factor(summer_sens, levels = sensitivity_factor_levels))-1,
-                winter_sens = as.numeric(factor(winter_sens, levels = sensitivity_factor_levels))-1,
-                winter_sens_expert_id = ifelse(winter_sens_expert_id == "Y", 1, 0),
-                summer_sens_expert_id = ifelse(summer_sens_expert_id == "Y", 1, 0),
-                fish_observed = as.numeric(factor(fish_observed, levels = c("N","Y"))) - 1,
-                habitat_value = as.numeric(factor(habitat_value, levels = c("Low habitat value",
-                                                                            "Medium habitat value",
-                                                                            "High habitat value"))) - 1,
-                number_distinct_SAR = number_distinct_SAR)
-
-# Calculate drought risk table.
-stream_drought_risk = all_streams_w_weights |> 
-  sf::st_drop_geometry() |> 
-  dplyr::select(BLUE_LINE_KEY,GNIS_NAME,habitat_value,summer_sens,winter_sens,winter_sens_expert_id,summer_sens_expert_id,number_distinct_SAR,fish_observed) |> 
-  tidyr::pivot_longer(cols = -c(BLUE_LINE_KEY, GNIS_NAME)) |> 
-  dplyr::select(BLUE_LINE_KEY,GNIS_NAME,name,value) |> 
-  dplyr::filter(!is.na(value)) |> 
-  dplyr::distinct() |> 
-  # In the case of multiple values, just keep the highest one for each BLK and GNIS_NAME
-  dplyr::group_by(BLUE_LINE_KEY,GNIS_NAME,name) |> 
-  dplyr::slice_max(value) |> 
-  dplyr::ungroup() |> 
-  dplyr::group_by(BLUE_LINE_KEY,GNIS_NAME) |> 
-  dplyr::mutate(drought_risk = sum(value, na.rm=T)) |> 
-  dplyr::select(-c(name,value)) |> 
-  dplyr::distinct() |> 
-  dplyr::ungroup()
-
-# 2. Add drought risk table to the spatial object.
-all_streams_c = all_streams_c |> 
-  dplyr::select(BLUE_LINE_KEY,GNIS_NAME,habitat_value,summer_sens,winter_sens,winter_sens_expert_id,summer_sens_expert_id,number_distinct_SAR,fish_observed) |> 
-  dplyr::left_join(stream_drought_risk)
-
-# top_200 = all_streams |> 
-#   dplyr::arrange(desc(drought_risk)) |> 
-#   dplyr::slice(1:200)
+# # test$expert_id
 # 
-# sf::write_sf(top_200, 'app/www/top_200_streams_by_drought_risk.gpkg')
-
-sf::write_sf(all_streams_c |> 
-               dplyr::select(BLUE_LINE_KEY, GNIS_NAME, drought_risk, 
-                             summer_sens, winter_sens, 
-                             winter_sens_expert_id,summer_sens_expert_id,
-                             habitat_value,
-                             fish_observed, number_distinct_SAR), 'app/www/all_streams_w_drought_risk.gpkg')
+# ##### CODE BELOW HAS NOT BEEN TESTED OR RERUN IN A WHILE
+#   
+# nrow(test)
+# # Make sure that 
+# all_streams_w_weights = all_streams_c |> 
+#   dplyr::mutate(summer_sens = as.numeric(factor(summer_sens, levels = sensitivity_factor_levels))-1,
+#                 winter_sens = as.numeric(factor(winter_sens, levels = sensitivity_factor_levels))-1,
+#                 winter_sens_expert_id = ifelse(winter_sens_expert_id == "Y", 1, 0),
+#                 summer_sens_expert_id = ifelse(summer_sens_expert_id == "Y", 1, 0),
+#                 fish_observed = as.numeric(factor(fish_observed, levels = c("N","Y"))) - 1,
+#                 habitat_value = as.numeric(factor(habitat_value, levels = c("Low habitat value",
+#                                                                             "Medium habitat value",
+#                                                                             "High habitat value"))) - 1,
+#                 number_distinct_SAR = number_distinct_SAR)
+# 
+# # Calculate drought risk table.
+# stream_drought_risk = all_streams_w_weights |> 
+#   sf::st_drop_geometry() |> 
+#   dplyr::select(BLUE_LINE_KEY,GNIS_NAME,habitat_value,summer_sens,winter_sens,winter_sens_expert_id,summer_sens_expert_id,number_distinct_SAR,fish_observed) |> 
+#   tidyr::pivot_longer(cols = -c(BLUE_LINE_KEY, GNIS_NAME)) |> 
+#   dplyr::select(BLUE_LINE_KEY,GNIS_NAME,name,value) |> 
+#   dplyr::filter(!is.na(value)) |> 
+#   dplyr::distinct() |> 
+#   # In the case of multiple values, just keep the highest one for each BLK and GNIS_NAME
+#   dplyr::group_by(BLUE_LINE_KEY,GNIS_NAME,name) |> 
+#   dplyr::slice_max(value) |> 
+#   dplyr::ungroup() |> 
+#   dplyr::group_by(BLUE_LINE_KEY,GNIS_NAME) |> 
+#   dplyr::mutate(drought_risk = sum(value, na.rm=T)) |> 
+#   dplyr::select(-c(name,value)) |> 
+#   dplyr::distinct() |> 
+#   dplyr::ungroup()
+# 
+# # 2. Add drought risk table to the spatial object.
+# all_streams_c = all_streams_c |> 
+#   dplyr::select(BLUE_LINE_KEY,GNIS_NAME,habitat_value,summer_sens,winter_sens,winter_sens_expert_id,summer_sens_expert_id,number_distinct_SAR,fish_observed) |> 
+#   dplyr::left_join(stream_drought_risk)
+# 
+# # top_200 = all_streams |> 
+# #   dplyr::arrange(desc(drought_risk)) |> 
+# #   dplyr::slice(1:200)
+# # 
+# # sf::write_sf(top_200, 'app/www/top_200_streams_by_drought_risk.gpkg')
+# 
+# sf::write_sf(all_streams_c |> 
+#                dplyr::select(BLUE_LINE_KEY, GNIS_NAME, drought_risk, 
+#                              summer_sens, winter_sens, 
+#                              winter_sens_expert_id,summer_sens_expert_id,
+#                              habitat_value,
+#                              fish_observed, number_distinct_SAR), 'app/www/all_streams_w_drought_risk.gpkg')

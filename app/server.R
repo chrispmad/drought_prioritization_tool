@@ -17,9 +17,16 @@ server <- function(input, output, session) {
   # Read in ecosections with drought
   ecosecs = sf::read_sf('ecosections_with_drought_sensitivity_and_sar.gpkg')
   
-  ron_id_streams = sf::read_sf('ron_identified_streams.gpkg') |>
-    sf::st_transform(crs = 4326)
+  # ron_id_streams = sf::read_sf('ron_identified_streams.gpkg') |>
+  #   sf::st_transform(crs = 4326)
 
+  ron_id_streams = sf::read_sf('ron_streams_layer_v2.shp') |>
+    sf::st_transform(crs = 4326)
+  # Add in column for colour palette
+  
+  ron_id_streams = ron_id_streams |> 
+    dplyr::mutate(color_val = paste0(Summer_Sen,Winter_Sen))
+  
   incProgress(1/3,
               detail = 'Read in ecosections!')
   
@@ -27,7 +34,8 @@ server <- function(input, output, session) {
   
   # Read in all streams from our prioritization model run. (N = 94828)
   # Note that this only includes streams of order 3 or greater.
-  all_streams = sf::read_sf('all_streams_w_drought_risk_and_rons_streams_matched_2.gpkg')
+  # all_streams = sf::read_sf('all_streams_w_drought_risk_and_rons_streams_matched_2.gpkg')
+  all_streams = sf::read_sf('streams_simplified.gpkg')
   
   incProgress(1/3,
               detail = 'Read in streams!')
@@ -53,7 +61,8 @@ server <- function(input, output, session) {
       dplyr::arrange(dplyr::desc(drought_risk)) |> 
       dplyr::slice(1:input$number_streams_to_show) #|> 
       # rmapshaper::ms_simplify()
-  })
+  }) |> 
+    shiny::debounce(1000)
   
   ecosecs_season_selected = reactive({
     if(input$season_input == 'Summer'){
@@ -142,18 +151,30 @@ server <- function(input, output, session) {
         )
 
         
-    # Apply weights to variables.
-    all_streams_w_weights = all_streams |> 
-      dplyr::mutate(summer_sens = input$summer_sens_w_input * as.numeric(factor(summer_sens, levels = sensitivity_factor_levels))-1,
-                    winter_sens = input$winter_sens_w_input * as.numeric(factor(winter_sens, levels = sensitivity_factor_levels))-1,
-                    # expert_id = input$exp_id_w_input * expert_id,
-                    fish_observed = input$fish_obs_w_input * as.numeric(factor(fish_observed, levels = c("N","Y"))) - 1,
-                    stream_summer_sens = input$stream_summer_sens_w_input * ifelse(stream_summer_sens == 'Y', 1, 0),
-                    stream_winter_sens = input$stream_winter_sens_w_input * ifelse(stream_winter_sens == 'Y', 1, 0),
-                    # habitat_value = input$habitat_quality_w_input * as.numeric(factor(habitat_value, levels = c("Low habitat value",
-                                                                                        # "Medium habitat value",
-                                                                                        # "High habitat value"))) - 1,
-                    number_distinct_SAR = input$sar_w_input * number_distinct_SAR)
+    # # Apply weights to variables.
+    # all_streams_w_weights = all_streams |> 
+    #   dplyr::mutate(summer_sens = input$summer_sens_w_input * as.numeric(factor(summer_sens, levels = sensitivity_factor_levels))-1,
+    #                 winter_sens = input$winter_sens_w_input * as.numeric(factor(winter_sens, levels = sensitivity_factor_levels))-1,
+    #                 # expert_id = input$exp_id_w_input * expert_id,
+    #                 fish_observed = input$fish_obs_w_input * as.numeric(factor(fish_observed, levels = c("N","Y"))) - 1,
+    #                 stream_summer_sens = input$stream_summer_sens_w_input * ifelse(stream_summer_sens == 'Y', 1, 0),
+    #                 stream_winter_sens = input$stream_winter_sens_w_input * ifelse(stream_winter_sens == 'Y', 1, 0),
+    #                 # habitat_value = input$habitat_quality_w_input * as.numeric(factor(habitat_value, levels = c("Low habitat value",
+    #                                                                                     # "Medium habitat value",
+    #                                                                                     # "High habitat value"))) - 1,
+        #                 number_distinct_SAR = input$sar_w_input * number_distinct_SAR)
+        # Apply weights to variables.
+        all_streams_w_weights = all_streams |> 
+          dplyr::mutate(summer_sens = as.numeric(factor(summer_sens, levels = sensitivity_factor_levels))-1,
+                        winter_sens = as.numeric(factor(winter_sens, levels = sensitivity_factor_levels))-1,
+                        # expert_id = input$exp_id_w_input * expert_id,
+                        fish_observed = input$fish_obs_w_input * as.numeric(factor(fish_observed, levels = c("N","Y"))) - 1,
+                        stream_summer_sens = ifelse(stream_summer_sens == 'Y', 1, 0),
+                        stream_winter_sens = ifelse(stream_winter_sens == 'Y', 1, 0),
+                        # habitat_value = input$habitat_quality_w_input * as.numeric(factor(habitat_value, levels = c("Low habitat value",
+                        # "Medium habitat value",
+                        # "High habitat value"))) - 1,
+                        number_distinct_SAR = input$sar_w_input * number_distinct_SAR)
     
     # Use the reactive object that lists the columns the user has flagged to include
     # to include / exclude columns from our all_streams object.
@@ -222,6 +243,14 @@ server <- function(input, output, session) {
   )
   })
   
+  stream_popup_tables = leafpop::popupTable(
+    ron_id_streams |> 
+      sf::st_drop_geometry() |> 
+      dplyr::select(
+        StreamName,Summer_Sen,Winter_Sen
+        )
+  )
+  
   # # Make label popup for ecosections.
   ecosection_label = leafpop::popupTable(
       ecosecs |>
@@ -239,6 +268,13 @@ server <- function(input, output, session) {
                                         levels = c("Very Sensitive--Chronic Problems",
                                                    "Sensitive Proceed with caution",
                                                    "Not Sensitive"))
+  
+  
+  ron_id_color_pal = leaflet::colorFactor(palette = 'RdYlGn',
+                                          levels = c("YY",
+                                                     "YN",
+                                                     "NY",
+                                                     "NN"))
   
   # Make colour palette for high-drought risk streams
   drought_pal = reactive({
@@ -289,12 +325,10 @@ server <- function(input, output, session) {
         fill = 'purple',
         data = sar,
       ) |>
-      addPolygons(
+      addPolylines(
         data = ron_id_streams,
-        label = ~StreamName,
+        label = ~lapply(stream_popup_tables, htmltools::HTML),
         color = 'lightblue',
-        fill = 'lightblue',
-        fillOpacity = 1,
         opacity = 1,
         group = 'Expert ID',
         options = pathOptions(pane = 'Ron_ID_pane')

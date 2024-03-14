@@ -12,42 +12,42 @@ library(capture)
 winter_sens_w_input = div(
   fluidRow(
     column(
-      width = 2,
+      width = 12,
       # Checkbox input
       checkboxInput('include_winter_sens',
-                    '',
+                    'Winter  - Ecosection',
                     value = T)
-    ),
-    column(
-      width = 10,
-      numericInput('winter_sens_w_input',
-                   'Winter  - Ecosection',
-                   min = 1, 
-                   max = 5,
-                   value = 1) |> 
-        tooltip('a value from 1 to 5')
-    )
+    )#,
+    # column(
+    #   width = 10,
+    #   numericInput('winter_sens_w_input',
+    #                'Winter  - Ecosection',
+    #                min = 1, 
+    #                max = 5,
+    #                value = 1) |> 
+    #     tooltip('a value from 1 to 5')
+    # )
   )
 )
 
 summer_sens_w_input = div(
   fluidRow(
     column(
-      width = 2,
+      width = 12,
       # Checkbox input
       checkboxInput('include_summer_sens',
-                    '',
+                    'Summer - Ecosection',
                     value = T)
-    ),
-    column(
-      width = 10,
-      numericInput('summer_sens_w_input',
-                   'Summer - Ecosection',
-                   min = 1, 
-                   max = 5,
-                   value = 1) |> 
-        tooltip('a value from 1 to 5')
-    )
+    )#,
+    # column(
+    #   width = 10,
+    #   numericInput('summer_sens_w_input',
+    #                'Summer - Ecosection',
+    #                min = 1, 
+    #                max = 5,
+    #                value = 1) |> 
+    #     tooltip('a value from 1 to 5')
+    # )
   )
 )
 
@@ -74,40 +74,40 @@ summer_sens_w_input = div(
 stream_summer_sens_w_input = div(
   fluidRow(
     column(
-      width = 2,
+      width = 12,
       checkboxInput('include_stream_summer_sens',
-                    '',
+                    'Summer - Stream',
                     value = T)
-    ),
-    column(
-      width = 10,
-      numericInput('stream_summer_sens_w_input',
-                   'Summer - Stream',
-                   min = 1,
-                   max = 5,
-                   value = 1) |>
-        tooltip('a value from 1 to 5')
-    )
+    )#,
+    # column(
+    #   width = 10,
+    #   numericInput('stream_summer_sens_w_input',
+    #                'Summer - Stream',
+    #                min = 1,
+    #                max = 5,
+    #                value = 1) |>
+    #     tooltip('a value from 1 to 5')
+    # )
   )
 )
 
 stream_winter_sens_w_input = div(
   fluidRow(
     column(
-      width = 2,
+      width = 12,
       checkboxInput('include_stream_winter_sens',
-                    '',
+                    'Winter - Stream',
                     value = T)
-    ),
-    column(
-      width = 10,
-      numericInput('stream_winter_sens_w_input',
-                   'Winter - Stream',
-                   min = 1,
-                   max = 5,
-                   value = 1) |>
-        tooltip('a value from 1 to 5')
-    )
+    )#,
+    # column(
+    #   width = 10,
+    #   numericInput('stream_winter_sens_w_input',
+    #                'Winter - Stream',
+    #                min = 1,
+    #                max = 5,
+    #                value = 1) |>
+    #     tooltip('a value from 1 to 5')
+    # )
   )
 )
 
@@ -178,28 +178,28 @@ number_streams_to_show = sliderInput(
   'number_streams_to_show',
   'Number of Streams to Show',
   min = 25,
-  max = 300,
+  max = 1000,
   value = 200,
-  step = 25
+  step = 50
 )
 
 weight_inputs = div(
   h5("Drought Sensitivity"),
   fluidRow(
-    column(width = 6,
-           winter_sens_w_input
-           ),
-    column(width = 6,
-           summer_sens_w_input
-           )
-  ),
-  fluidRow(
-    column(width = 6,
-           stream_winter_sens_w_input
-    ),
-    column(width = 6,
+    # column(width = 6,
+           winter_sens_w_input,
+           # ),
+    # column(width = 6,
+           summer_sens_w_input,
+           # )
+  # ),
+  # fluidRow(
+    # column(width = 6,
+           stream_winter_sens_w_input,
+    # ),
+    # column(width = 6,
            stream_summer_sens_w_input
-    )
+    # )
   ),
   h5("Ecological Variables"),
   # fluidRow(
@@ -277,9 +277,9 @@ main = div(
     tags$img(id = "loadingImg", 
              src = "map_load_still_complete.png", 
              style = "position:absolute;width:145vh;
-           height:90vh;top:8vh;left:60vh;z-index:1000;"),
+           height:90vh;top:10.5vh;left:60vh;z-index:1000;"),
     tags$div(
-      style = 'position:absolute;width:145vh;background-color:grey;opacity:0.5;height:90vh;top:8vh;left:60vh;z-index:1100;'
+      style = 'position:absolute;width:145vh;background-color:grey;opacity:0.5;height:90vh;top:10.5vh;left:60vh;z-index:1100;'
     ),
     tags$p('Loading... please wait 1 - 2 minutes...',
            style = 'position:absolute;top:55vh;left:120vh;z-index:1101;font-family:fantasy;font-size:larger;')
@@ -292,7 +292,8 @@ main = div(
 ui <- page_navbar(
   shinyjs::useShinyjs(),
   theme = bslib::bs_theme(preset = 'flatly'),
-  title = 'Stream Drought Sensitivity',
+  # title = 'Stream Drought Sandbox',
+  title = 'Ptolemy Drought-Sensitive Stream Visualizer',
   selected = 'Tool',
   bslib::nav_panel(
     title = 'Tool',

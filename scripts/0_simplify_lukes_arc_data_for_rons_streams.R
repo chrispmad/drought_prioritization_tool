@@ -5,8 +5,6 @@ luke = read_sf('raw_data/DroughtSensitiveStreams.shp')
 
 luke = st_zm(luke)
 
-luke$BLUE_LINE_
-
 luke = luke |> 
   dplyr::mutate(BLUE_LINE_ = as.character(BLUE_LINE_))
 
