@@ -9,33 +9,97 @@ server <- function(input, output, session) {
     setwd(paste0(getwd(),'/www/'))
   }
   
-  shiny::withProgress(
-    message = 'Setting up map',
-    detail = 'reading in ecosections...',
-    value = 0, {
-    
   # Read in ecosections with drought
   ecosecs = sf::read_sf('ecosections_with_drought_sensitivity_and_sar.gpkg')
   
-  incProgress(1/2, detail = 'Read in ecosections')
-
-  ron_id_streams = sf::read_sf('ron_streams_layer_v2.shp') |>
+  ron_id_streams = sf::read_sf('ron_streams_layer_v2.gpkg') |>
     sf::st_transform(crs = 4326) |> 
     dplyr::mutate(sum_label = ifelse(Summer_Sen == 'Y', 'Yes (<20% MAD)','No (>=20% MAD)'),
                   wint_label = ifelse(Winter_Sen == 'Y', 'Yes (<20% MAD)','No (>=20% MAD)')) |> 
-    dplyr::mutate(sens_combo = paste0(Summer_Sen,Winter_Sen)) |> 
-    dplyr::mutate(leaf_col = case_when(
-      sens_combo == 'NN' ~ 'darkblue',
-      sens_combo %in% c('YN','NY') ~ 'yellow',
-      sens_combo == 'YY' ~ 'red'
-    ))
+    dplyr::mutate(sens_combo = paste0(Summer_Sen,Winter_Sen))
   
-  incProgress(1/2, detail = 'Read in Rons streams')
+  # Update an input that depends on stream names.
+  stream_names = unique(ron_id_streams$StreamName)[order(unique(ron_id_streams$StreamName))]
   
+  shinyWidgets::updatePickerInput(session = session, inputId = "stream_name_search",
+                                  choices = stream_names,
+                                  selected = NA)
+  
+  ron_stream_simplification_amount = reactive({
+    req(!is.null(input$str_geo_simpl_amount))
+    input$str_geo_simpl_amount
+  }) |> 
+    shiny::debounce(millis = 2000)
+  
+  arrow_icon <- awesomeIcons(
+    icon = 'arrow-up',
+    iconColor = 'black',
+    markerColor = 'red'
+  )
+  
+  ron_id_streams_simple = reactive({
+    
+    req(!is.null(ron_stream_simplification_amount()))
+    
+    print("Simplifying Ron's stream file!")
+    
+    # Simplify ron's streams' geometries by specified amount
+    if(ron_stream_simplification_amount() > 0){
+      ron_streams_simple = sf::st_simplify(
+        ron_id_streams,
+        dTolerance = ron_stream_simplification_amount()
+      )
+    } else {
+      ron_streams_simple = ron_id_streams
+    }
+    
+    print("Simplifying finished!")
+    
+    ron_streams_simple
   })
+  
+  ron_id_st = reactive({
+    req(!is.null(ron_id_streams_simple()))
+      if(input$season_sel == 'Both'){
+        output = ron_id_streams_simple() |> 
+          dplyr::mutate(leaf_col = case_when(
+          sens_combo == 'NN' ~ input$stream_NN_colour,
+          sens_combo %in% c('YN','NY') ~ input$stream_some_colour,
+          sens_combo == 'YY' ~ input$stream_YY_colour
+        ))
+      }
+      if(input$season_sel == 'Summer'){
+        output = ron_id_streams_simple() |> 
+          dplyr::mutate(leaf_col = case_when(
+            sens_combo %in% c('NN','NY') ~ input$stream_NN_colour,
+            sens_combo %in% c('YN','YY') ~ input$stream_YY_colour
+          ))
+      }
+      if(input$season_sel == 'Winter'){
+        output = ron_id_streams_simple() |> 
+          dplyr::mutate(leaf_col = case_when(
+            sens_combo %in% c('NN','YN') ~ input$stream_NN_colour,
+            sens_combo %in% c('NY','YY') ~ input$stream_YY_colour
+          ))
+      }
+    output
+  })
+  
+  # A specifically searched stream - make a bounding box for it?
+  highlight_data = reactive({
+    req(input$stream_name_search != 'NA')
 
-  selected_streams = reactive({
-    ron_id_streams
+    coords = ron_id_st() |> 
+      dplyr::filter(StreamName == input$stream_name_search) |> 
+      sf::st_boundary() |> 
+      sf::st_cast("POINT") |> 
+      dplyr::slice(1) |> 
+      sf:: st_coordinates() |> 
+      as.data.frame()
+    
+    names(coords) <- c('lng','lat')
+    
+    coords
   })
   
   # Popup table for streams
@@ -48,7 +112,7 @@ server <- function(input, output, session) {
         'Stream Winter Sensitivity' = wint_label
       )
   )
-
+  
   # Make label popup for ecosections.
   ecosection_label = leafpop::popupTable(
       ecosecs |>
@@ -57,10 +121,6 @@ server <- function(input, output, session) {
                       `Winter Sensitivity` = winter_sens,
                       `Summer Sensitivity` = summer_sens)
     )
-  
-  # # Stream colour palette
-  # stream_pal = leaflet::colorFactor(palette = 'RlYlGn',
-  #                      domain = unique(ron_id_streams$sens_combo))
   
   # Make colour palette for ecosections from Ron Ptolemy.
   ecosection_pal = leaflet::colorFactor(palette = 'RdYlGn',
@@ -71,10 +131,12 @@ server <- function(input, output, session) {
   
   # Leaflet map
   output$leaflet_map = renderLeaflet({
+    
     l = leaflet() |> 
       addProviderTiles(provider = providers$CartoDB) |> 
       addMapPane(name = 'ecosec_pane', zIndex = 400) |> 
       addMapPane(name = 'Ron_ID_pane', zIndex = 450) |> 
+      addMapPane(name = 'highlight_pane', zIndex = 600) |> 
       addPolygons(
         data = ecosecs,
         label = ~ECOSECTION_NAME,
@@ -84,7 +146,7 @@ server <- function(input, output, session) {
         fillOpacity = 0.25,
         group = 'Ecosection - Summer',
         options = pathOptions(pane = 'ecosec_pane')
-      ) |> 
+      ) |>
       addPolygons(
         data = ecosecs,
         label = ~ECOSECTION_NAME,
@@ -94,15 +156,6 @@ server <- function(input, output, session) {
         fillOpacity = 0.25,
         group = 'Ecosection - Winter',
         options = pathOptions(pane = 'ecosec_pane')
-      ) |> 
-      addPolylines(
-        data = ron_id_streams,
-        label = ~StreamName,
-        popup = ~lapply(stream_info_tables, htmltools::HTML),
-        color = ~leaf_col,
-        opacity = 1,
-        group = 'Expert ID',
-        options = pathOptions(pane = 'Ron_ID_pane')
       ) |>
       addLegend(
         title = 'Ecosection Drought Sensitivity',
@@ -114,13 +167,6 @@ server <- function(input, output, session) {
                    'orange',
                    '#b8091e')
       ) |> 
-      addLegend(
-        title = 'Stream Drought Sensitivity',
-        labels = c("Not Summer or Winter",
-                   "Summer or Winter",
-                   "Summer and Winter"),
-        colors = c('darkblue','yellow','red')
-      ) |> 
       addLayersControl(position = 'bottomright',
                        overlayGroups = c('Ecosection - Summer','Ecosection - Winter',
                                          'Expert ID'),
@@ -128,9 +174,69 @@ server <- function(input, output, session) {
       addScaleBar(position = 'bottomright') |> 
       leaflet.extras::addResetMapButton()
     
-    shinyjs::hide(id = "loadingImg",anim = T,time = 3, animType = 'fade')
+    # shinyjs::hide(id = "loadingImg",anim = T,time = 3, animType = 'fade')
     
     l
+  })
+  
+  observe({
+    if(!is.null(input$stream_name_search)){
+      l = leafletProxy('leaflet_map') |>
+        clearGroup('highlight_box') |> 
+        clearGroup('Expert ID') |> 
+        leaflet::removeControl('stream_legend') |> 
+        addPolylines(
+          data = ron_id_st(),
+          label = ~StreamName,
+          popup = ~lapply(stream_info_tables, htmltools::HTML),
+          color = ~leaf_col,
+          opacity = 1,
+          group = 'Expert ID',
+          options = pathOptions(pane = 'Ron_ID_pane')
+        ) |> 
+        leaflet.extras::addSearchFeatures(targetGroups = 'Expert ID')
+      
+      # Add stream legend
+      if(input$season_sel %in% c('Winter','Summer')){
+        l = l |> 
+          addLegend(
+            title = 'Stream Drought Sensitivity',
+            labels = c("Not Sensitive",
+                       "Sensitive"),
+            layerId = 'stream_legend',
+            colors = c(
+              input$stream_NN_colour,
+              input$stream_YY_colour
+            )
+          )
+      }
+      if(input$season_sel == 'Both'){
+        l = l |> 
+          addLegend(
+            title = 'Stream Drought Sensitivity',
+            labels = c("Not Sensitive (>= 20% MAD)",
+                       "Winter or Summer Sensitive (< 20% MAD)",
+                       "Winter *and* Summer Sensitive (< 20% MAD)"),
+            layerId = 'stream_legend',
+            colors = c(
+              input$stream_NN_colour,
+              input$stream_some_colour,
+              input$stream_YY_colour
+            )
+          )
+      }
+      
+      if(input$stream_name_search != 'NA'){
+
+        l = l |>
+          addMarkers(data = highlight_data(),
+                     group = 'highlight_box',
+                     options = pathOptions(pane = 'highlight_pane')
+                    )
+      }
+      
+      l
+    }
   })
   
   output$download_csv <- downloadHandler(
@@ -139,7 +245,7 @@ server <- function(input, output, session) {
       },
     content = function(file) {
       write.csv(
-        selected_streams() |> sf::st_drop_geometry(),
+        ron_id_st() |> sf::st_drop_geometry(),
         file
       )
     }
@@ -151,7 +257,7 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       sf::write_sf(
-        selected_streams(),
+        ron_id_st(),
         file
       )
     }
