@@ -15,3 +15,4 @@ all_streams_w_drought_risk_all_vars.gpkg
 alternate_app_datasets/**
 app/rsconnect/**
 *.gpkg
+docs/**

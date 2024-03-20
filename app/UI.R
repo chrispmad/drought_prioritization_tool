@@ -4,6 +4,24 @@ library(leaflet)
 library(leafpop)
 library(capture)
 
+# Record of Luke's stream digitization:
+
+# 441 streams in Ron's original excel table. 
+# That includes some that were both N/N sensitivity 
+# (not sure why they were included in the first place). 
+# I think from the original unsuccessful list, 
+# there were only 6 streams not yet accounted for that mattered 
+# (9 total, but one was destroyed by a mine anyway, 
+# one was Fort Nelson River but it was captured in another 
+# ecosection anyway, and the other was an N/N sensitivity anyway
+                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                    
+# =======================
+#   Read in data for inputs
+# =======================
+
+nr_regs = sf::read_sf('www/nr_regions.gpkg')
+
 # =======================
 #   Define UI pieces      
 # =======================
@@ -15,65 +33,104 @@ library(capture)
 
 season_selector = radioButtons(
   'season_sel',
-  'Season Selector',
+  'Season',
   choices = c("Summer","Winter","Both"),
   selected = c("Both")
 )
 
-stream_by_name_selector = shinyWidgets::pickerInput(
-  inputId = "stream_name_search",
-  label = "Stream Name", 
-  choices = NA,
+stream_by_name_selector = fluidRow(
+  column(
+    width = 9,
+    shinyWidgets::pickerInput(
+      inputId = "stream_name_search",
+      label = "Stream Name", 
+      choices = NA,
+      options = list(
+        `live-search` = TRUE
+      )
+    )
+  ),
+  column(
+    width = 2,
+    actionButton(
+      'reset_name_search',
+      'Reset'
+    )
+  ),
+  style = 'align-items:center;'
+)
+
+nr_reg_selector = shinyWidgets::pickerInput(
+  inputId = "nr_reg_search",
+  label = "Natural Resource Region", 
+  choices = c('Whole Province',stringr::str_remove(nr_regs$REGION_NAME,' Natural.*')),
+  selected = 'Whole Province',
   options = list(
     `live-search` = TRUE
-    )
+  )
 )
 
 stream_geometry_simplification = sliderInput(
   'str_geo_simpl_amount',
   'Stream Geometry Simplification (m)',
-  value = 10,
+  value = 50,
   min = 0, 
   max = 100, 
   step = 5
-)
+) |> 
+  bslib::tooltip("Down-sample the number of points, merging all points in X meters")
 
 stream_nn_picker = shinyWidgets::colorPickr(
   'stream_NN_colour',
-  label = 'Not Drought Sensitive',
+  label = 'Neither',
   selected = 'darkblue'
 )
 
 stream_some_picker = shinyWidgets::colorPickr(
   'stream_some_colour',
-  label = 'Not Drought Sensitive',
+  label = 'Summer or Winter',
   selected = 'yellow'
 )
 
 stream_yy_picker = shinyWidgets::colorPickr(
   'stream_YY_colour',
-  label = 'Not Drought Sensitive',
+  label = 'Summer and Winter',
   selected = 'red'
 )
 
 the_accordion = accordion(
   id = 'sidebar_accordion',
   accordion_panel(
-    title = 'Selectors',
+    title = 'Filters',
     season_selector,
+    nr_reg_selector,
     stream_by_name_selector
   ),
   accordion_panel(
     title = 'Visual Options',
-    stream_nn_picker,
-    stream_some_picker,
-    stream_yy_picker,
+    h5("Seasonal Drought Sensitivity"),
+    # layout_column_wrap(
+    #   1/3,
+    fluidRow(
+      column(width = 4,
+             stream_nn_picker
+             ),
+      column(width = 4,
+             stream_some_picker),
+      column(width = 4,
+             stream_yy_picker)
+    ),
+      # stream_nn_picker,
+      # stream_some_picker,
+      # stream_yy_picker,
+    # ),
     stream_geometry_simplification
   )
 )
 
 sidebar = div(
   the_accordion,
+  div(
   layout_column_wrap(
     1/3,
     capture::capture(
@@ -90,6 +147,8 @@ sidebar = div(
     downloadButton('download_gpkg','\n.GPKG',
                    style = 'padding:10px;display:grid;height:10vh;',
                    class = "btn-secondary")
+  ),
+  style = 'padding-top:10px;'
   ),
   style = 'padding-top:10px;'
 )
@@ -113,6 +172,37 @@ main = div(
                 height = '90vh'
                 )
 )
+
+metadata_page = bslib::nav_panel(
+      title = 'Metadata',
+        bslib::card(
+          card_image(
+            file = 'www/Ron_Excel_Screenshot_clipped.png',
+            width = '1000px'
+          )
+      )
+    )
+
+# Metadata page
+# metadata_page = bslib::nav_panel(
+#   title = 'Metadata',
+#   h1("Data Sources"),
+#   h3("BC Data Catalogue"),
+#   h5("1. Conservation Data Center"),
+#   p("Publically available Aquatic Species-at-risk layer"),
+#   h5('2. Streams from the Freshwater Atlas layer'),
+#   p("Stream network lines (only steams of order 3 or greater included)"),
+#   h5('3. PSCIS (Provincial Stream Crossing Inventory System)'),
+#   p('Describes various measures of fish passage, habitat quality, waterway morphology.'),
+#   h3("Provincial Hydrologist Ron Ptolemy"),
+#   h5('1. Drought Sensitivity of Ecosections'),
+#   HTML("<br><br>"),
+#   h3("Contact"),
+#   h5("Luke Eilertsen"),
+#   p('Luke.Eilertsen@gov.bc.ca'),
+#   h5("Chris Madsen"),
+#   p('Chris.Madsen@gov.bc.ca')
+# )
     
 ui <- page_navbar(
   shinyjs::useShinyjs(),
@@ -132,25 +222,7 @@ ui <- page_navbar(
              )
     )
   ),
-  bslib::nav_panel(
-    title = 'Metadata',
-    h1("Data Sources"),
-    h3("BC Data Catalogue"),
-    h5("1. Conservation Data Center"),
-    p("Publically available Aquatic Species-at-risk layer"),
-    h5('2. Streams from the Freshwater Atlas layer'),
-    p("Stream network lines (only steams of order 3 or greater included)"),
-    h5('3. PSCIS (Provincial Stream Crossing Inventory System)'),
-    p('Describes various measures of fish passage, habitat quality, waterway morphology.'),
-    h3("Provincial Hydrologist Ron Ptolemy"),
-    h5('1. Drought Sensitivity of Ecosections'),
-    HTML("<br><br>"),
-    h3("Contact"),
-    h5("Luke Eilertsen"),
-    p('Luke.Eilertsen@gov.bc.ca'),
-    h5("Chris Madsen"),
-    p('Chris.Madsen@gov.bc.ca')
-  ),
+  metadata_page,
   nav_item(
     bslib::input_dark_mode()
   )
