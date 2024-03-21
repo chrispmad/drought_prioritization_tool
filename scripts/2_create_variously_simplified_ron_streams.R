@@ -30,6 +30,8 @@ leaflet() |>
     color = 'purple'
   )
 
+file.remove('app/www/ron_streams_layer_very_simple.gpkg')
+
 sf::write_sf(ron_str_v_simple,
              'app/www/ron_streams_layer_very_simple.gpkg')
 

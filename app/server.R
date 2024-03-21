@@ -22,19 +22,22 @@ server <- function(input, output, session) {
                   wint_label = ifelse(Winter_Sen == 'Y', 'Yes (<20% MAD)','No (>=20% MAD)')) |> 
     dplyr::mutate(sens_combo = paste0(Summer_Sen,Winter_Sen))
   
+  ron_id_streams = ron_id_streams |> 
+    dplyr::arrange(StreamName)
+  
   # Update an input that depends on stream names.
-  stream_names = unique(ron_id_streams$StreamName)[order(unique(ron_id_streams$StreamName))]
+  stream_names = unique(ron_id_streams$StreamName)
   
   shinyWidgets::updatePickerInput(session = session, 
                                   inputId = "stream_name_search",
                                   choices = stream_names,
                                   selected = NA)
   
-  ron_stream_simplification_amount = reactive({
-    req(!is.null(input$str_geo_simpl_amount))
-    input$str_geo_simpl_amount
-  }) |> 
-    shiny::debounce(millis = 2000)
+  # ron_stream_simplification_amount = reactive({
+  #   req(!is.null(input$str_geo_simpl_amount))
+  #   input$str_geo_simpl_amount
+  # }) |> 
+  #   shiny::debounce(millis = 2000)
   
   arrow_icon <- awesomeIcons(
     icon = 'arrow-up',
@@ -42,46 +45,46 @@ server <- function(input, output, session) {
     markerColor = 'red'
   )
   
-  ron_id_streams_simple = reactive({
-    
-    req(!is.null(ron_stream_simplification_amount()))
-    
-    print("Simplifying Ron's stream file!")
-    
-    # Simplify ron's streams' geometries by specified amount
-    if(ron_stream_simplification_amount() > 0){
-      # Have one preset simplified version, at, say, 50m downsampling.
-      if(ron_stream_simplification_amount() == 50){
-        print("Just reading in Ron's layer simplified to 50m")
-        # ron_streams_simple = sf::read_sf('ron_streams_layer_very_simple.gpkg') |> 
-        #   sf::st_transform(crs = 4326) |> 
-        #   dplyr::mutate(sum_label = ifelse(Summer_Sen == 'Y', 'Yes (<20% MAD)','No (>=20% MAD)'),
-        #                 wint_label = ifelse(Winter_Sen == 'Y', 'Yes (<20% MAD)','No (>=20% MAD)')) |> 
-        #   dplyr::mutate(sens_combo = paste0(Summer_Sen,Winter_Sen))
-        ron_streams_simple = ron_id_streams
-      } else {
-        ron_streams_simple = sf::st_simplify(
-          ron_id_streams,
-          dTolerance = ron_stream_simplification_amount()
-        )
-      }
-    } else {
-      ron_streams_simple = ron_id_streams
-    }
-    
-    print("Simplifying finished!")
-    
-    ron_streams_simple
-  })
+  # ron_id_streams_simple = reactive({
+  #   
+  #   req(!is.null(ron_stream_simplification_amount()))
+  #   
+  #   print("Simplifying Ron's stream file!")
+  #   
+  #   # Simplify ron's streams' geometries by specified amount
+  #   if(ron_stream_simplification_amount() > 0){
+  #     # Have one preset simplified version, at, say, 50m downsampling.
+  #     if(ron_stream_simplification_amount() == 50){
+  #       print("Just reading in Ron's layer simplified to 50m")
+  #       # ron_streams_simple = sf::read_sf('ron_streams_layer_very_simple.gpkg') |> 
+  #       #   sf::st_transform(crs = 4326) |> 
+  #       #   dplyr::mutate(sum_label = ifelse(Summer_Sen == 'Y', 'Yes (<20% MAD)','No (>=20% MAD)'),
+  #       #                 wint_label = ifelse(Winter_Sen == 'Y', 'Yes (<20% MAD)','No (>=20% MAD)')) |> 
+  #       #   dplyr::mutate(sens_combo = paste0(Summer_Sen,Winter_Sen))
+  #       ron_streams_simple = ron_id_streams
+  #     } else {
+  #       ron_streams_simple = sf::st_simplify(
+  #         ron_id_streams,
+  #         dTolerance = ron_stream_simplification_amount()
+  #       )
+  #     }
+  #   } else {
+  #     ron_streams_simple = ron_id_streams
+  #   }
+  #   
+  #   print("Simplifying finished!")
+  #   
+  #   ron_streams_simple
+  # })
   
   # Do 2 things: listen for the user to pick a radiobutton for Season
   # and adapt data to that choice, and do an overlay of ron's streams
   # with the natural resource regions and, if a region has been selected
   # by dropdown, just show those streams.
   ron_id_st = reactive({
-    req(!is.null(ron_id_streams_simple()))
+    req(!is.null(input$season_sel))
       if(input$season_sel == 'Both'){
-        output = ron_id_streams_simple() |> 
+        output = ron_id_streams |> 
           dplyr::mutate(leaf_col = case_when(
           sens_combo == 'NN' ~ input$stream_NN_colour,
           sens_combo %in% c('YN','NY') ~ input$stream_some_colour,
@@ -89,14 +92,14 @@ server <- function(input, output, session) {
         ))
       }
       if(input$season_sel == 'Summer'){
-        output = ron_id_streams_simple() |> 
+        output = ron_id_streams |> 
           dplyr::mutate(leaf_col = case_when(
             sens_combo %in% c('NN','NY') ~ input$stream_NN_colour,
             sens_combo %in% c('YN','YY') ~ input$stream_YY_colour
           ))
       }
       if(input$season_sel == 'Winter'){
-        output = ron_id_streams_simple() |> 
+        output = ron_id_streams |> 
           dplyr::mutate(leaf_col = case_when(
             sens_combo %in% c('NN','YN') ~ input$stream_NN_colour,
             sens_combo %in% c('NY','YY') ~ input$stream_YY_colour
@@ -152,7 +155,7 @@ server <- function(input, output, session) {
   highlight_data = reactive({
     req(searched_stream_name() != 'NA')
 
-    coords = ron_id_streams_simple() |> 
+    coords = ron_id_streams |> 
       dplyr::filter(StreamName == searched_stream_name()) |> 
       sf::st_boundary() |> 
       sf::st_cast("POINT") |> 
@@ -166,15 +169,17 @@ server <- function(input, output, session) {
   })
   
   # Popup table for streams
-  stream_info_tables = leafpop::popupTable(
-    ron_id_streams |>
-      sf::st_drop_geometry() |>
-      dplyr::select(
-        'Name' = GNIS_NAME,
-        'Stream Summer Sensitivity' = sum_label,
-        'Stream Winter Sensitivity' = wint_label
-      )
-  )
+  stream_info_tables = reactive({
+    leafpop::popupTable(
+      ron_id_st() |>
+        sf::st_drop_geometry() |>
+        dplyr::select(
+          'Name' = GNIS_NAME,
+          'Stream Summer Sensitivity' = sum_label,
+          'Stream Winter Sensitivity' = wint_label
+        )
+    )
+  })
   
   # Make label popup for ecosections.
   ecosection_label = leafpop::popupTable(
@@ -225,7 +230,7 @@ server <- function(input, output, session) {
       addPolylines(
         data = ron_id_st(),
         label = ~StreamName,
-        popup = ~lapply(stream_info_tables, htmltools::HTML),
+        popup = ~lapply(stream_info_tables(), htmltools::HTML),
         color = ~leaf_col,
         opacity = 1,
         group = 'Expert ID',

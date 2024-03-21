@@ -119,12 +119,12 @@ the_accordion = accordion(
              stream_some_picker),
       column(width = 4,
              stream_yy_picker)
-    ),
+    )#,
       # stream_nn_picker,
       # stream_some_picker,
       # stream_yy_picker,
     # ),
-    stream_geometry_simplification
+    # stream_geometry_simplification
   )
 )
 
