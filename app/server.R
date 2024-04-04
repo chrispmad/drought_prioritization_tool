@@ -25,6 +25,8 @@ server <- function(input, output, session) {
   ron_id_streams = ron_id_streams |> 
     dplyr::arrange(StreamName)
   
+  wsc_stations = sf::read_sf('wsc_stations_w_ron_data.gpkg')
+  
   # Update an input that depends on stream names.
   stream_names = unique(ron_id_streams$StreamName)
   
@@ -83,7 +85,7 @@ server <- function(input, output, session) {
   # by dropdown, just show those streams.
   ron_id_st = reactive({
     req(!is.null(input$season_sel))
-      if(input$season_sel == 'Both'){
+      if(input$season_sel == 'Summer and Winter'){
         output = ron_id_streams |> 
           dplyr::mutate(leaf_col = case_when(
           sens_combo == 'NN' ~ input$stream_NN_colour,
@@ -108,6 +110,18 @@ server <- function(input, output, session) {
     
     # Spatial match with natural resource regions
     output = output |> 
+      sf::st_join(nr_regs)
+    
+    if(input$nr_reg_search != 'Whole Province'){
+      output = output |> 
+        dplyr::filter(stringr::str_remove(REGION_NAME,' Natural.*') == input$nr_reg_search)
+    }
+    output
+  })
+  
+  # Reactive form of the WSC stations, pending natural resource region selection.
+  wsc_stations_r = reactive({
+    output = wsc_stations |> 
       sf::st_join(nr_regs)
     
     if(input$nr_reg_search != 'Whole Province'){
@@ -181,6 +195,12 @@ server <- function(input, output, session) {
     )
   })
   
+  # Popup table for water survey canada stations
+  wsc_info_tables = leafpop::popupTable(
+    wsc_stations |> 
+      sf::st_drop_geometry()
+  )
+  
   # Make label popup for ecosections.
   ecosection_label = leafpop::popupTable(
       ecosecs |>
@@ -196,6 +216,15 @@ server <- function(input, output, session) {
                                                    "Sensitive Proceed with caution",
                                                    "Not Sensitive"))
   
+  # Make colour palette for water survey canada stations - not sure which var, for now, mad_l_s?
+  wsc_pal = leaflet::colorNumeric(palette = 'Spectral',
+                                  domain = wsc_stations$mad_l_s,
+                                  reverse = TRUE)
+  # And the mirror image one for the legend...
+  wsc_pal_r = leaflet::colorNumeric(palette = 'Spectral',
+                                    domain = wsc_stations$mad_l_s,
+                                    reverse = TRUE)
+  
   # Leaflet map
   output$leaflet_map = renderLeaflet({
     
@@ -205,6 +234,7 @@ server <- function(input, output, session) {
       addMapPane(name = 'ecosec_pane', zIndex = 400) |> 
       addMapPane(name = 'Ron_ID_pane', zIndex = 450) |> 
       addMapPane(name = 'highlight_pane', zIndex = 600) |> 
+      addMapPane(name = 'wsc_stations', zIndex = 350) |> 
       addPolygons(
         data = ecosecs,
         label = ~ECOSECTION_NAME,
@@ -225,6 +255,13 @@ server <- function(input, output, session) {
         group = 'Ecosection - Winter',
         options = pathOptions(pane = 'ecosec_pane')
       ) |>
+      addCircleMarkers(
+        data = wsc_stations_r(), 
+        label = ~STATION_NAME, 
+        popup = lapply(wsc_info_tables, HTML), 
+        color = ~wsc_pal(mad_l_s),
+        group = 'WSC_Stations',
+        options = pathOptions(pane = 'wsc_stations')) |> 
       clearGroup('Expert ID') |> 
       leaflet::removeControl('stream_legend') |> 
       addPolylines(
@@ -256,14 +293,20 @@ server <- function(input, output, session) {
                    'orange',
                    '#b8091e')
       ) |> 
+      addLegend(position = 'topright',
+                title = 'Water Survey Canada\nMAD (L/s)',
+                pal = wsc_pal_r,
+                values = wsc_stations$mad_l_s) |> 
       addLayersControl(position = 'bottomright',
                        overlayGroups = c('Ecosection - Summer',
                                          'Ecosection - Winter',
+                                         'WSC_Stations',
                                          'NR Regions',
                                          'Expert ID'),
                        options = layersControlOptions(collapsed = F)) |> 
       addScaleBar(position = 'bottomright') |> 
-      leaflet.extras::addResetMapButton()
+      leaflet.extras::addResetMapButton() |> 
+      leaflet::hideGroup('WSC_Stations')
     
     # shinyjs::hide(id = "loadingImg",anim = T,time = 3, animType = 'fade')
     # Add legend conditionally
@@ -281,7 +324,7 @@ server <- function(input, output, session) {
           )
         )
     }
-    if(input$season_sel == 'Both'){
+    if(input$season_sel == 'Summer and Winter'){
       l = l |> 
         addLegend(
           title = 'Stream Drought Sensitivity',
@@ -355,20 +398,32 @@ server <- function(input, output, session) {
     leaf_zoom(input$leaflet_map_zoom)
   })
   
-  name_for_downloads = reactive({
+  name_for_stream_downloads = reactive({
     if(input$nr_reg_search == 'Whole Province'){
-      name = paste0('Stream_Drought_Prioritization_',Sys.Date())
+      name = paste0('Ptolemy_Stream_Drought_Prioritization_',Sys.Date())
     } else {
-      name = paste0('Stream_Drought_Prioritization_',
+      name = paste0('Ptolemy_Stream_Drought_Prioritization_',
                     input$nr_reg_search,'_',
                     Sys.Date())
     }
     name
   })
   
+  name_for_wsc_downloads = reactive({
+    if(input$nr_reg_search == 'Whole Province'){
+      name = paste0('Ptolemy_WSC_Drought_Prioritization_',Sys.Date())
+    } else {
+      name = paste0('Ptolemy_WSC_Drought_Prioritization_',
+                    input$nr_reg_search,'_',
+                    Sys.Date())
+    }
+    name
+  })
+  
+  # Stream CSV Download
   output$download_csv <- downloadHandler(
     filename = function() { 
-      paste0(name_for_downloads(),'.csv')
+      paste0(name_for_stream_downloads(),'.csv')
       },
     content = function(file) {
       write.csv(
@@ -378,13 +433,39 @@ server <- function(input, output, session) {
     }
   )
   
+  # Stream Geopackage Download
   output$download_gpkg <- downloadHandler(
     filename = function() { 
-      paste0(name_for_downloads(),'.gpkg')
+      paste0(name_for_stream_downloads(),'.gpkg')
     },
     content = function(file) {
       sf::write_sf(
         ron_id_st(),
+        file
+      )
+    }
+  )
+  
+  # Ptolemy Data at WSC station Download
+  output$download_wsc_csv <- downloadHandler(
+    filename = function() { 
+      paste0(name_for_wsc_downloads(),'.csv')
+    },
+    content = function(file) {
+      write.csv(
+        wsc_stations_r() |> sf::st_drop_geometry(),
+        file
+      )
+    }
+  )
+  
+  output$download_wsc_gpkg <- downloadHandler(
+    filename = function() { 
+      paste0(name_for_wsc_downloads(),'.gpkg')
+    },
+    content = function(file) {
+      sf::write_sf(
+        wsc_stations_r(),
         file
       )
     }

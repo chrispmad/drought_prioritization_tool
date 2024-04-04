@@ -7,15 +7,15 @@ library(capture)
 # Record of Luke's stream digitization:
 
 # 441 streams in Ron's original excel table. 
-# That includes some that were both N/N sensitivity 
+# That includes some that were Summer and Winter N/N sensitivity 
 # (not sure why they were included in the first place). 
 # I think from the original unsuccessful list, 
 # there were only 6 streams not yet accounted for that mattered 
 # (9 total, but one was destroyed by a mine anyway, 
 # one was Fort Nelson River but it was captured in another 
 # ecosection anyway, and the other was an N/N sensitivity anyway
-                                                                                                                                                                                                                                    
-                                                                                                                                                                                                                                    
+
+
 # =======================
 #   Read in data for inputs
 # =======================
@@ -34,8 +34,8 @@ nr_regs = sf::read_sf('www/nr_regions.gpkg')
 season_selector = radioButtons(
   'season_sel',
   'Season',
-  choices = c("Summer","Winter","Both"),
-  selected = c("Both")
+  choices = c("Summer","Winter","Summer and Winter"),
+  selected = c("Summer and Winter")
 )
 
 stream_by_name_selector = fluidRow(
@@ -100,6 +100,7 @@ stream_yy_picker = shinyWidgets::colorPickr(
 
 the_accordion = accordion(
   id = 'sidebar_accordion',
+  multiple = FALSE,
   accordion_panel(
     title = 'Filters',
     season_selector,
@@ -114,42 +115,84 @@ the_accordion = accordion(
     fluidRow(
       column(width = 4,
              stream_nn_picker
-             ),
+      ),
       column(width = 4,
              stream_some_picker),
       column(width = 4,
              stream_yy_picker)
-    )#,
-      # stream_nn_picker,
-      # stream_some_picker,
-      # stream_yy_picker,
-    # ),
-    # stream_geometry_simplification
+    )
+  ),
+  accordion_panel(
+    title = 'Downloads',
+    h5("Ptolemy Data for Streams"),
+    div(
+      layout_column_wrap(
+        1/3,
+        capture::capture(
+          selector = "body",
+          filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
+          icon("camera"), "Capture",
+          style = 'padding:10px;display:grid;height:10vh;',
+          class = "btn-info"
+        ),
+        downloadButton('download_csv',shiny::HTML('Spread\nsheet'),
+                       style = 'padding:10px;display:grid;height:10vh;',
+                       class = "btn-warning"
+        ),
+        downloadButton('download_gpkg','\n.GPKG',
+                       style = 'padding:10px;display:grid;height:10vh;',
+                       class = "btn-secondary")
+      ),
+      style = 'padding-top:10px;'
+    ),
+    h5("Ptolemy Data for WSC Stations"),
+    layout_column_wrap(
+      1/2,
+      downloadButton('download_wsc_csv',shiny::HTML('Spreadsheet'),
+                     style = 'padding:10px;display:grid;height:10vh;',
+                     class = "btn-warning"
+      ),
+      downloadButton('download_wsc_gpkg','\n.GPKG',
+                     style = 'padding:10px;display:grid;height:10vh;',
+                     class = "btn-secondary")
+    )
   )
 )
 
 sidebar = div(
   the_accordion,
-  div(
-  layout_column_wrap(
-    1/3,
-    capture::capture(
-      selector = "body",
-      filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
-      icon("camera"), "Capture",
-      style = 'padding:10px;display:grid;height:10vh;',
-      class = "btn-info"
-    ),
-    downloadButton('download_csv',shiny::HTML('Spreadsheet'),
-                   style = 'padding:10px;display:grid;height:10vh;',
-                   class = "btn-warning"
-    ),
-    downloadButton('download_gpkg','\n.GPKG',
-                   style = 'padding:10px;display:grid;height:10vh;',
-                   class = "btn-secondary")
-  ),
-  style = 'padding-top:10px;'
-  ),
+  # h5("Ptolemy Data for Streams"),
+  # div(
+  # layout_column_wrap(
+  #   1/3,
+  #   capture::capture(
+  #     selector = "body",
+  #     filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
+  #     icon("camera"), "Capture",
+  #     style = 'padding:10px;display:grid;height:10vh;',
+  #     class = "btn-info"
+  #   ),
+  #   downloadButton('download_csv',shiny::HTML('Spreadsheet'),
+  #                  style = 'padding:10px;display:grid;height:10vh;',
+  #                  class = "btn-warning"
+  #   ),
+  #   downloadButton('download_gpkg','\n.GPKG',
+  #                  style = 'padding:10px;display:grid;height:10vh;',
+  #                  class = "btn-secondary")
+  # ),
+  # style = 'padding-top:10px;'
+  # ),
+  # h5("Ptolemy Data for WSC Stations"),
+  # layout_column_wrap(
+  #   1/2,
+  #   downloadButton('download_wsc_csv',shiny::HTML('Spreadsheet'),
+  #                  style = 'padding:10px;display:grid;height:10vh;',
+  #                  class = "btn-warning"
+  #   ),
+  #   downloadButton('download_wsc_gpkg','\n.GPKG',
+  #                  style = 'padding:10px;display:grid;height:10vh;',
+  #                  class = "btn-secondary")
+  # ),
   style = 'padding-top:10px;'
 )
 
@@ -168,20 +211,20 @@ main = div(
   #   tags$p('Loading... please wait 1 - 2 minutes...',
   #          style = 'position:absolute;top:55vh;left:120vh;z-index:1101;font-family:fantasy;font-size:larger;')
   # ),
-    leafletOutput('leaflet_map',
+  leafletOutput('leaflet_map',
                 height = '90vh'
-                )
+  )
 )
 
 metadata_page = bslib::nav_panel(
-      title = 'Metadata',
-        bslib::card(
-          card_image(
-            file = 'www/Ron_Excel_Screenshot_clipped.png',
-            width = '1000px'
-          )
-      )
+  title = 'Metadata',
+  bslib::card(
+    card_image(
+      file = 'www/Ron_Excel_Screenshot_clipped.png',
+      width = '1000px'
     )
+  )
+)
 
 # Metadata page
 # metadata_page = bslib::nav_panel(
@@ -203,7 +246,7 @@ metadata_page = bslib::nav_panel(
 #   h5("Chris Madsen"),
 #   p('Chris.Madsen@gov.bc.ca')
 # )
-    
+
 ui <- page_navbar(
   shinyjs::useShinyjs(),
   theme = bslib::bs_theme(preset = 'flatly'),
@@ -216,10 +259,10 @@ ui <- page_navbar(
     fluidRow(
       column(width = 3,
              sidebar
-             ),
+      ),
       column(width = 9,
              main
-             )
+      )
     )
   ),
   metadata_page,
