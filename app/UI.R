@@ -123,7 +123,7 @@ the_accordion = accordion(
     )
   ),
   accordion_panel(
-    title = 'Downloads',
+    title = 'Data Downloads',
     h5("Ptolemy Data for Streams"),
     div(
       layout_column_wrap(
@@ -132,20 +132,20 @@ the_accordion = accordion(
           selector = "body",
           filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
           icon("camera"), "Capture",
-          style = 'padding:10px;display:grid;height:10vh;',
+          style = 'padding:2vh;display:grid;height:12vh;',
           class = "btn-info"
         ),
         downloadButton('download_csv',shiny::HTML('Spread\nsheet'),
-                       style = 'padding:10px;display:grid;height:10vh;',
+                       style = 'padding:10px;display:grid;height:12vh;',
                        class = "btn-warning"
         ),
         downloadButton('download_gpkg','\n.GPKG',
-                       style = 'padding:10px;display:grid;height:10vh;',
+                       style = 'padding:2vh;display:grid;height:12vh;',
                        class = "btn-secondary")
       ),
       style = 'padding-top:10px;'
     ),
-    h5("Ptolemy Data for WSC Stations"),
+    h5("Ptolemy Data for Water Survey\n Canada Hydrometric Stations"),
     layout_column_wrap(
       1/2,
       downloadButton('download_wsc_csv',shiny::HTML('Spreadsheet'),
@@ -161,67 +161,69 @@ the_accordion = accordion(
 
 sidebar = div(
   the_accordion,
-  # h5("Ptolemy Data for Streams"),
-  # div(
-  # layout_column_wrap(
-  #   1/3,
-  #   capture::capture(
-  #     selector = "body",
-  #     filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
-  #     icon("camera"), "Capture",
-  #     style = 'padding:10px;display:grid;height:10vh;',
-  #     class = "btn-info"
-  #   ),
-  #   downloadButton('download_csv',shiny::HTML('Spreadsheet'),
-  #                  style = 'padding:10px;display:grid;height:10vh;',
-  #                  class = "btn-warning"
-  #   ),
-  #   downloadButton('download_gpkg','\n.GPKG',
-  #                  style = 'padding:10px;display:grid;height:10vh;',
-  #                  class = "btn-secondary")
-  # ),
-  # style = 'padding-top:10px;'
-  # ),
-  # h5("Ptolemy Data for WSC Stations"),
-  # layout_column_wrap(
-  #   1/2,
-  #   downloadButton('download_wsc_csv',shiny::HTML('Spreadsheet'),
-  #                  style = 'padding:10px;display:grid;height:10vh;',
-  #                  class = "btn-warning"
-  #   ),
-  #   downloadButton('download_wsc_gpkg','\n.GPKG',
-  #                  style = 'padding:10px;display:grid;height:10vh;',
-  #                  class = "btn-secondary")
-  # ),
   style = 'padding-top:10px;'
 )
 
 # Main page with map
 
 main = div(
-  # tags$div(
-  #   id = "loadingImg",
-  #   tags$img(id = "loadingImg", 
-  #            src = "map_load_still_complete.png", 
-  #            style = "position:absolute;width:145vh;
-  #          height:90vh;top:10.5vh;left:60vh;z-index:1000;"),
-  #   tags$div(
-  #     style = 'position:absolute;width:145vh;background-color:grey;opacity:0.5;height:90vh;top:10.5vh;left:60vh;z-index:1100;'
-  #   ),
-  #   tags$p('Loading... please wait 1 - 2 minutes...',
-  #          style = 'position:absolute;top:55vh;left:120vh;z-index:1101;font-family:fantasy;font-size:larger;')
-  # ),
   leafletOutput('leaflet_map',
-                height = '90vh'
+                height = '85vh'
+  )
+)
+
+main_page = bslib::nav_panel(
+  title = 'Tool',
+  shinyFeedback::useShinyFeedback(),
+  fluidRow(
+    column(width = 3,
+           sidebar
+    ),
+    column(width = 9,
+           main
+    )
   )
 )
 
 metadata_page = bslib::nav_panel(
   title = 'Metadata',
+  p("To learn more about how these metrics were calculated and dive into the methodology, \ndownload Ron Ptolemy's draft paper using the download button below."),
+  downloadButton('download_EFN_paper',
+                 "Download (~11 MB)",
+                 style = 'padding:10px;display:grid;height:10vh;width:50vh;',
+                 class = "btn-success"
+  )
+)
+
+data_dictionary_page = bslib::nav_panel(
+  title = 'Data Dictionary',
   bslib::card(
-    card_image(
-      file = 'www/Ron_Excel_Screenshot_clipped.png',
-      width = '1000px'
+    DT::datatable(
+      tidyr::tibble(
+        STATION_NUMBER = 'Water Survey Canada Hydrometric Station Number',
+        STATION_NAME = 'Water Survey Canada Hydrometric Station Name',
+        location = 'Relative location in stream; possible values: lower, mid, upper',
+        state = 'One of natural ("Nat") or "regulated" ("Reg"), i.e. the stream has point(s) of diversion/augmentation upstream of station',
+        years_record = 'Number of years for which critical flow periods could be calculated',
+        da_km_2 = 'Drainage Area in square kilometers',
+        mad_l_s = 'Mean Annual Discharge in litres per second',
+        runoff_l_s_km_2 = 'Annual runoff in litres per second per drainage area',
+        mm_year = 'Annual runoff in millimeters per year',
+        `20_mad` = '20% threshold of Mean Annual Discharge',
+        alt_type = 'Alteration type: diversion (D), augmentation (A), or none (N)',
+        summer_cpsf_mad = 'Percentage of Mean Annual Discharge during month with lowest average flows during Critical Period Stream Flows in Summer',
+        max_summer = 'Maximum value during the CPSF summer period, as percent',
+        min_summer = 'Minimum value during the CPSF summer period, as percent',
+        winter_cpsf_mad = 'Percentage of Mean Annual Discharge during month with lowest average flows during Critical Period Stream Flows in Winter',
+        max_winter = 'Maximum value during the CPSF winter period, as percent',
+        min_winter = 'Minimum value during the CPSF winter period, as percent',
+        lwy_fraction = 'low-water yield (measure of variability of annual run-off as fraction of long-term mean)',
+        hwy_fraction = 'high-water yield (measure of variability of annual run-off as fraction of long-term mean)'
+      ) |> 
+        tidyr::pivot_longer(cols = dplyr::everything(),
+                            names_to = 'Variable',
+                            values_to = 'Defintion'),
+      options = list(pageLength = 19)
     )
   )
 )
@@ -250,23 +252,19 @@ metadata_page = bslib::nav_panel(
 ui <- page_navbar(
   shinyjs::useShinyjs(),
   theme = bslib::bs_theme(preset = 'flatly'),
-  # title = 'Stream Drought Sandbox',
   title = 'Ptolemy Tool: Drought-Sensitive Stream Dataset',
-  selected = 'Tool',
-  bslib::nav_panel(
-    title = 'Tool',
-    shinyFeedback::useShinyFeedback(),
-    fluidRow(
-      column(width = 3,
-             sidebar
-      ),
-      column(width = 9,
-             main
-      )
-    )
-  ),
+  includeCSS('www/my_styles.css'),
+  main_page,
+  data_dictionary_page,
   metadata_page,
   nav_item(
     bslib::input_dark_mode()
+  ),
+  nav_item(
+    div(
+      class = 'bc_logo'
+    )
   )
 )
+
+ui

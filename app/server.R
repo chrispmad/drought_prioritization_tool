@@ -260,9 +260,9 @@ server <- function(input, output, session) {
         label = ~STATION_NAME, 
         popup = lapply(wsc_info_tables, HTML), 
         color = ~wsc_pal(mad_l_s),
-        group = 'WSC_Stations',
+        group = 'WSC Stations',
         options = pathOptions(pane = 'wsc_stations')) |> 
-      clearGroup('Expert ID') |> 
+      clearGroup('Streams') |> 
       leaflet::removeControl('stream_legend') |> 
       addPolylines(
         data = ron_id_st(),
@@ -270,7 +270,7 @@ server <- function(input, output, session) {
         popup = ~lapply(stream_info_tables(), htmltools::HTML),
         color = ~leaf_col,
         opacity = 1,
-        group = 'Expert ID',
+        group = 'Streams',
         options = pathOptions(pane = 'Ron_ID_pane')
       ) |> 
       addPolygons(
@@ -293,20 +293,20 @@ server <- function(input, output, session) {
                    'orange',
                    '#b8091e')
       ) |> 
-      addLegend(position = 'topright',
+      addLegend(position = 'bottomleft',
                 title = 'Water Survey Canada\nMAD (L/s)',
                 pal = wsc_pal_r,
                 values = wsc_stations$mad_l_s) |> 
       addLayersControl(position = 'bottomright',
                        overlayGroups = c('Ecosection - Summer',
                                          'Ecosection - Winter',
-                                         'WSC_Stations',
+                                         'WSC Stations',
                                          'NR Regions',
-                                         'Expert ID'),
+                                         'Streams'),
                        options = layersControlOptions(collapsed = F)) |> 
       addScaleBar(position = 'bottomright') |> 
       leaflet.extras::addResetMapButton() |> 
-      leaflet::hideGroup('WSC_Stations')
+      leaflet::hideGroup('WSC Stations')
     
     # shinyjs::hide(id = "loadingImg",anim = T,time = 3, animType = 'fade')
     # Add legend conditionally
@@ -360,7 +360,7 @@ server <- function(input, output, session) {
     if(!is.null(input$stream_name_search)){
       l = leafletProxy('leaflet_map') |>
         clearGroup('highlight_box') #|> 
-        # clearGroup('Expert ID') |> 
+        # clearGroup('Streams') |> 
         # leaflet::removeControl('stream_legend') |> 
         # addPolylines(
         #   data = ron_id_st(),
@@ -368,7 +368,7 @@ server <- function(input, output, session) {
         #   popup = ~lapply(stream_info_tables, htmltools::HTML),
         #   color = ~leaf_col,
         #   opacity = 1,
-        #   group = 'Expert ID',
+        #   group = 'Streams',
         #   options = pathOptions(pane = 'Ron_ID_pane')
         # )
       
@@ -468,6 +468,21 @@ server <- function(input, output, session) {
         wsc_stations_r(),
         file
       )
+    }
+  )
+  
+  output$download_EFN_paper = downloadHandler(
+    filename = function() { 
+      paste0("RPtolemy_EFN_Hydrology_Paper.zip")
+    },
+    content = function(file) {
+      files_to_zip <- c("ref_docs/EFN_Hydrology_Paper_New.docx", 
+                        "ref_docs/Hydrology_Sup_Figures.docx", 
+                        "ref_docs/Figure Captions Hydrology_Main.docx")
+      # Full paths to the files to be zipped
+      full_paths <- file.path(files_to_zip)
+      # Zip the files
+      zip(file, files = full_paths)
     }
   )
 }
