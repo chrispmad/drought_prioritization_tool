@@ -231,10 +231,10 @@ server <- function(input, output, session) {
     l = leaflet() |> 
       addProviderTiles(provider = providers$CartoDB) |> 
       addMapPane(name = 'nr_regs', zIndex = 300) |> 
-      addMapPane(name = 'ecosec_pane', zIndex = 400) |> 
+      addMapPane(name = 'ecosec_pane', zIndex = 350) |> 
       addMapPane(name = 'Ron_ID_pane', zIndex = 450) |> 
       addMapPane(name = 'highlight_pane', zIndex = 600) |> 
-      addMapPane(name = 'wsc_stations', zIndex = 350) |> 
+      addMapPane(name = 'wsc_stations', zIndex = 400) |> 
       addPolygons(
         data = ecosecs,
         label = ~ECOSECTION_NAME,
@@ -285,7 +285,7 @@ server <- function(input, output, session) {
       ) |> 
       addLegend(
         title = 'Ecosection Drought Sensitivity',
-        group = 'ecosec_legend',
+        group = 'Ecosection - Winter',
         labels = c('Not Sensitive',
                    'Sensitive Proceed with caution',
                    'Very Sensitive--Chronic Problems'),
@@ -295,6 +295,7 @@ server <- function(input, output, session) {
       ) |> 
       addLegend(position = 'bottomleft',
                 title = 'Water Survey Canada\nMAD (L/s)',
+                group = 'WSC Stations',
                 pal = wsc_pal_r,
                 values = wsc_stations$mad_l_s) |> 
       addLayersControl(position = 'bottomright',
@@ -305,7 +306,14 @@ server <- function(input, output, session) {
                                          'Streams'),
                        options = layersControlOptions(collapsed = F)) |> 
       addScaleBar(position = 'bottomright') |> 
-      leaflet.extras::addResetMapButton() |> 
+      leaflet::addEasyButton(button = easyButton(
+        icon = 'ion-arrow-shrink',
+        title = 'Center map',
+        onClick = JS("function(btn, map){ 
+                     map.setZoom(5);
+                     map.setView([54.55,-126.5],5)
+                     }")
+      )) |> 
       leaflet::hideGroup('WSC Stations')
     
     # shinyjs::hide(id = "loadingImg",anim = T,time = 3, animType = 'fade')
@@ -315,6 +323,7 @@ server <- function(input, output, session) {
       l = l |> 
         addLegend(
           title = 'Stream Drought Sensitivity',
+          group = 'Streams',
           labels = c("Not Sensitive (>= 20% MAD)",
                      "Sensitive (< 20% MAD)"),
           layerId = 'stream_legend',
@@ -328,6 +337,7 @@ server <- function(input, output, session) {
       l = l |> 
         addLegend(
           title = 'Stream Drought Sensitivity',
+          group = 'Streams',
           labels = c("Not Sensitive (>= 20% MAD)",
                      "Winter or Summer Sensitive (< 20% MAD)",
                      "Winter <b>and</b> Summer Sensitive (< 20% MAD)"),
@@ -357,7 +367,7 @@ server <- function(input, output, session) {
   })
   
   observe({
-    if(!is.null(input$stream_name_search)){
+    if(!is.null(input$stream_name_search) | input$ptolemy_page == 'Tool'){
       l = leafletProxy('leaflet_map') |>
         clearGroup('highlight_box') #|> 
         # clearGroup('Streams') |> 
@@ -372,13 +382,15 @@ server <- function(input, output, session) {
         #   options = pathOptions(pane = 'Ron_ID_pane')
         # )
       
-      if(searched_stream_name() != 'NA'){
-
-        l = l |>
-          addMarkers(data = highlight_data(),
-                     group = 'highlight_box',
-                     options = pathOptions(pane = 'highlight_pane')
-                    )
+      if(!is.null(searched_stream_name())){
+        if(searched_stream_name() != 'NA'){
+          
+          l = l |>
+            addMarkers(data = highlight_data(),
+                       group = 'highlight_box',
+                       options = pathOptions(pane = 'highlight_pane')
+            )
+        }
       }
       
       l
@@ -441,6 +453,32 @@ server <- function(input, output, session) {
     content = function(file) {
       sf::write_sf(
         ron_id_st(),
+        file
+      )
+    }
+  )
+  
+  # Ecosection CSV download
+  output$download_ecos_csv <- downloadHandler(
+    filename = function() {
+      paste0('Ptolemy_Ecosection_Drought_Prioritization_',Sys.Date(),'.csv')
+    },
+    content = function(file) {
+      write.csv(
+        ecosecs |> sf::st_drop_geometry(),
+        file
+      )
+    }
+  )
+  
+  # Ecosection Geopackage Download
+  output$download_ecos_gpkg <- downloadHandler(
+    filename = function() {
+      paste0('Ptolemy_Ecosection_Drought_Prioritization_',Sys.Date(),'.gpkg')
+    },
+    content = function(file) {
+      sf::write_sf(
+        ecosecs,
         file
       )
     }

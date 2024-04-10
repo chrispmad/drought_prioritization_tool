@@ -89,7 +89,7 @@ stream_nn_picker = shinyWidgets::colorPickr(
 stream_some_picker = shinyWidgets::colorPickr(
   'stream_some_colour',
   label = 'Summer or Winter',
-  selected = 'yellow'
+  selected = '#eddd47'
 )
 
 stream_yy_picker = shinyWidgets::colorPickr(
@@ -103,7 +103,6 @@ the_accordion = accordion(
   multiple = FALSE,
   accordion_panel(
     title = 'Filters',
-    season_selector,
     nr_reg_selector,
     stream_by_name_selector
   ),
@@ -112,6 +111,7 @@ the_accordion = accordion(
     h5("Seasonal Drought Sensitivity"),
     # layout_column_wrap(
     #   1/3,
+    season_selector,
     fluidRow(
       column(width = 4,
              stream_nn_picker
@@ -127,14 +127,14 @@ the_accordion = accordion(
     h5("Ptolemy Data for Streams"),
     div(
       layout_column_wrap(
-        1/3,
-        capture::capture(
-          selector = "body",
-          filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
-          icon("camera"), "Capture",
-          style = 'padding:2vh;display:grid;height:12vh;',
-          class = "btn-info"
-        ),
+        1/2,
+        # capture::capture(
+        #   selector = "body",
+        #   filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
+        #   icon("camera"), "Capture",
+        #   style = 'padding:2vh;display:grid;height:12vh;',
+        #   class = "btn-info"
+        # ),
         downloadButton('download_csv',shiny::HTML('Spread\nsheet'),
                        style = 'padding:10px;display:grid;height:12vh;',
                        class = "btn-warning"
@@ -144,6 +144,17 @@ the_accordion = accordion(
                        class = "btn-secondary")
       ),
       style = 'padding-top:10px;'
+    ),
+    h5("Ptolemy Data for Ecosections (Summer + Winter)"),
+    layout_column_wrap(
+      1/2, 
+      downloadButton('download_ecos_csv',shiny::HTML('Spreadsheet'),
+                     style = 'padding:10px;display:grid;height:10vh;',
+                     class = "btn-warning"
+      ),
+      downloadButton('download_ecos_gpkg','\n.GPKG',
+                     style = 'padding:10px;display:grid;height:10vh;',
+                     class = "btn-secondary")
     ),
     h5("Ptolemy Data for Water Survey\n Canada Hydrometric Stations"),
     layout_column_wrap(
@@ -250,6 +261,7 @@ data_dictionary_page = bslib::nav_panel(
 # )
 
 ui <- page_navbar(
+  id = 'ptolemy_page',
   shinyjs::useShinyjs(),
   theme = bslib::bs_theme(preset = 'flatly'),
   title = 'Ptolemy Tool: Drought-Sensitive Stream Dataset',
@@ -259,6 +271,15 @@ ui <- page_navbar(
   metadata_page,
   nav_item(
     bslib::input_dark_mode()
+  ),
+  nav_item(
+    capture::capture(
+      selector = "body",
+      filename = paste0("Stream_Drought_Prioritization_",Sys.Date(),"_screenshot.png"),
+      span(icon("camera"), "Screenshot"),
+      style = 'display:grid; height:5vh; width:18vh;',
+      class = "btn-success"
+    )
   ),
   nav_item(
     div(
