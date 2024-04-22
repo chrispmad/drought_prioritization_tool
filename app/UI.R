@@ -135,7 +135,7 @@ the_accordion = accordion(
         #   style = 'padding:2vh;display:grid;height:12vh;',
         #   class = "btn-info"
         # ),
-        downloadButton('download_csv',shiny::HTML('Spread\nsheet'),
+        downloadButton('download_csv',shiny::HTML('Spreadsheet'),
                        style = 'padding:10px;display:grid;height:12vh;',
                        class = "btn-warning"
         ),
