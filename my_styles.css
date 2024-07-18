@@ -1,0 +1,25 @@
+.navbar {
+            --bslib-navbar-inverse-bg: #6195e8
+    }
+
+.bc_logo {
+  position:absolute;
+  top: -10%;
+  left: 80%;
+  width: 35vh;
+  height: 35vh;
+  background: url("https://compass.gww.gov.bc.ca/wp-content/uploads/2021/03/wiw-white-text.svg");
+  background-repeat: no-repeat;
+  background-size: contain;"
+}
+      @keyframes streamflow {
+        0%{
+          --bslib-navbar-inverse-bg: animate ;
+        }
+        50%{
+        
+        }
+        100%{
+        
+        }
+      }
