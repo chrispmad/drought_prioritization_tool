@@ -28,7 +28,7 @@ ecosecs = ecosecs |>
   dplyr::select(ECOSECTION_NAME)
 
 # Ecosections with drought sensitivities
-ecosecs_w_d = read_sf('W:/CMadsen/shared_data_sets/ecosec_with_drought_sensitivity.gpkg')
+ecosecs_w_d = read_sf('//SFP.IDIR.BCGOV/S140/S40203/WFC AEB/General/2 SCIENCE - Invasives/AIS_R_Projects/CMadsen_Wdrive/shared_data_sets/ecosec_with_drought_sensitivity.gpkg')
 
 # Streams - this section will read in raw data and 
 # process it ONLY if the outputs are not already present. This saves 

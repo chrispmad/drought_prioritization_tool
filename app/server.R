@@ -173,11 +173,15 @@ server <- function(input, output, session) {
       dplyr::filter(StreamName == searched_stream_name()) |> 
       sf::st_boundary() |> 
       sf::st_cast("POINT") |> 
+      dplyr::group_by(EcoProvinc) |> 
       dplyr::slice(1) |> 
-      sf:: st_coordinates() |> 
-      as.data.frame()
+      dplyr::ungroup() |> 
+      dplyr::mutate(lng = sf::st_coordinates(geom)[,1],
+                    lat = sf::st_coordinates(geom)[,2]) #|> 
+      # sf::st_coordinates() |> 
+      # as.data.frame()
     
-    names(coords) <- c('lng','lat')
+    # names(coords) <- c('lng','lat')
     
     coords
   })
@@ -388,6 +392,7 @@ server <- function(input, output, session) {
           l = l |>
             addMarkers(data = highlight_data(),
                        group = 'highlight_box',
+                       label = ~paste0(StreamName," (",EcoProvinc,")"),
                        options = pathOptions(pane = 'highlight_pane')
             )
         }

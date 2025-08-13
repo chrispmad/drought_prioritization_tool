@@ -26,6 +26,7 @@ new_names[c(18,19,21,22)] <- c("Max_Summer","Min_Summer","Max_Winter","Min_Winte
 
 # Drop empty rows
 wsc_ron_data = wsc_ron_data[c(3:nrow(wsc_ron_data)),]
+
 # Apply new column names
 names(wsc_ron_data) <- new_names
 
@@ -45,7 +46,7 @@ wsc_ron_data = wsc_ron_data |>
 bc_stations = tidyhydat::realtime_stations(prov_terr_state_loc = 'BC')
 
 bc_stations = bc_stations |> 
-  dplyr::filter(STATION_NAME %in% unique(wsc_ron_data$stream))
+  dplyr::filter(STATION_NAME %in% unique(wsc_ron_data$STATION_NAME))
 
 stats_w_dat = bc_stations |> 
   sf::st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs = 4326) |> 

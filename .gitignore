@@ -16,3 +16,4 @@ alternate_app_datasets/**
 app/rsconnect/**
 *.gpkg
 docs/**
+*.csv
